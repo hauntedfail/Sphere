@@ -1,0 +1,32 @@
+{
+  "name": "sphere",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser control panel for IQOS devices over Web Bluetooth",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "check": "pnpm typecheck && pnpm coverage && pnpm e2e"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@types/web-bluetooth": "^0.0.22",
+    "@vitest/coverage-v8": "^5.1.0",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

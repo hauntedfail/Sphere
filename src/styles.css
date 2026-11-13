@@ -1,0 +1,1264 @@
+/*
+ * Sphere: a control surface in black, white and dots.
+ *
+ *   ink    white: text, and anything primary, selected or switched on
+ *   mute   grey: notes and labels
+ *   line   borders; every edge is square, nothing is rounded
+ *   red    alarms and danger, and nothing else
+ *
+ * Doto, a dot-matrix face, sets every name, figure and label, in capitals.
+ * Instrument Sans sets the sentences, which dots would make hard to read.
+ * The pictures are dot matrices too (see ui/dots.ts), in the same white.
+ */
+
+@font-face {
+  font-family: 'Doto';
+  src: url('./assets/fonts/doto-latin-full.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('./assets/fonts/instrument-sans-latin-wght.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  --void: #000000;
+  --well: #0b0b0b;
+  --line: #2a2a2a;
+  --line-strong: #5a5a5a;
+  --ink: #ffffff;
+  --mute: #a0a0a0;
+  --faint: #6b6b6b;
+  --red: #ff3b3b;
+
+  --dots: 'Doto', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html {
+  background: var(--void);
+  scrollbar-color: var(--line-strong) var(--void);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font: 400 15px / 1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  /* The page itself is a panel of unlit dots. */
+  background: radial-gradient(circle at 1px 1px, #1c1c1c 1px, transparent 1.5px) 0 0 / 22px 22px, var(--void);
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--void);
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+}
+
+button,
+input,
+table {
+  font: inherit;
+  color: inherit;
+}
+
+code {
+  font: inherit;
+  color: var(--ink);
+}
+
+a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Names, figures and labels are set in dots. */
+.dot-text,
+.button,
+.segment,
+.option,
+.pill,
+.chip,
+.jump a,
+.model-name,
+.steps li::before {
+  font-family: var(--dots);
+  font-weight: 900;
+  font-variation-settings: 'ROND' 100;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 8px;
+  z-index: 30;
+  padding: 8px 14px;
+  background: var(--ink);
+  color: var(--void);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip:focus {
+  left: 8px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+main:focus {
+  outline: none;
+}
+
+.dots {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--ink);
+}
+
+/* ── Shell and top bar ──────────────────────────────────────────────────── */
+
+.shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 20px 56px;
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  margin: 0 -20px;
+  padding: 0 20px;
+  background: var(--void);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Work in progress shows as a block running along the bar's lower edge. */
+.bar[data-busy='true']::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--ink), var(--ink)) 0 0 / 22% 100% no-repeat;
+  animation: sweep 0.9s steps(12) infinite;
+}
+
+@keyframes sweep {
+  from {
+    background-position: -30% 0;
+  }
+  to {
+    background-position: 130% 0;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-right: auto;
+}
+
+.brand-name {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.brand-version {
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-device {
+  color: var(--mute);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  color: var(--mute);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background: var(--faint);
+}
+
+.pill[data-state='ready'] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.pill[data-state='ready']::before {
+  background: var(--ink);
+}
+
+.pill[data-state='connecting']::before,
+.pill[data-state='working']::before {
+  background: var(--ink);
+  animation: blink 0.7s steps(2) infinite;
+}
+
+.pill[data-state='vibrating'] {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.pill[data-state='vibrating']::before {
+  background: var(--red);
+  animation: blink 0.3s steps(2) infinite;
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.15;
+  }
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--line-strong);
+  background: var(--void);
+  color: var(--ink);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--ink);
+}
+
+.button:active {
+  background: var(--ink);
+  color: var(--void);
+}
+
+/* The primary action is the white one. There is one per view. */
+.button.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--void);
+}
+
+.button.primary:hover {
+  background: #d6d6d6;
+  border-color: #d6d6d6;
+}
+
+.button.quiet {
+  min-height: 36px;
+  padding: 0 14px;
+  border-color: var(--line);
+  color: var(--mute);
+}
+
+.button.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.button.danger:active {
+  background: var(--red);
+  color: var(--void);
+}
+
+.button.alarm {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--void);
+}
+
+.button[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.is-waiting {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link:hover {
+  color: var(--mute);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+
+.card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: var(--void);
+}
+
+.card-title {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.card-lead,
+.card-foot {
+  color: var(--mute);
+  font-size: 14px;
+}
+
+.card-lead {
+  margin-top: 6px;
+}
+
+.card-foot {
+  margin-top: 16px;
+}
+
+.fold > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary::after {
+  content: '+';
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font: 400 16px / 22px var(--sans);
+  text-align: center;
+}
+
+.fold[open] > summary::after {
+  content: '\2212';
+}
+
+.fold[open] > summary {
+  margin-bottom: 14px;
+}
+
+.notice {
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--ink);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.footnote {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.pending {
+  color: var(--faint);
+  font: 400 13px / 1.4 var(--sans);
+  font-style: italic;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.bad {
+  color: var(--red);
+  font: 400 13px / 1.4 var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ── Intro ──────────────────────────────────────────────────────────────── */
+
+.intro {
+  display: grid;
+  gap: 40px;
+  padding-top: 32px;
+}
+
+.hero {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.orb {
+  width: min(240px, 60vw);
+}
+
+.wordmark {
+  font-size: clamp(64px, 21vw, 136px);
+  line-height: 0.86;
+  letter-spacing: 0.02em;
+}
+
+.lede {
+  max-width: 44ch;
+  color: var(--mute);
+  font-size: 17px;
+}
+
+.hero > .actions {
+  margin-top: 4px;
+}
+
+.hero > .actions .button {
+  min-height: 52px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+
+#saved-devices {
+  width: 100%;
+}
+
+#saved-devices:empty {
+  display: none;
+}
+
+.saved-card {
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+}
+
+.saved {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+}
+
+.saved li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved-id {
+  display: grid;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.saved-label {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.saved-name,
+.last-device {
+  color: var(--mute);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.saved .button {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.guide {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+
+.steps {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  position: relative;
+  padding-left: 38px;
+  color: var(--mute);
+  counter-increment: step;
+}
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 22px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.model-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.model-tile {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 12px 6px 10px;
+  border: 1px solid var(--line);
+  background: var(--void);
+  cursor: pointer;
+}
+
+.model-tile:hover {
+  border-color: var(--ink);
+}
+
+.model-tile .dots {
+  width: 62px;
+}
+
+.model-name {
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.plain {
+  display: grid;
+  gap: 10px;
+  padding-left: 18px;
+  color: var(--mute);
+  font-size: 14px;
+  list-style: square;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.matrix th,
+.matrix td {
+  padding: 7px 8px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.matrix thead th {
+  border-top: 0;
+  color: var(--mute);
+  font-weight: 500;
+}
+
+.matrix th[scope='row'] {
+  padding-left: 0;
+  color: var(--ink);
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+}
+
+.matrix td.no {
+  color: var(--faint);
+}
+
+/* ── Workspace ──────────────────────────────────────────────────────────── */
+
+.workspace {
+  display: grid;
+  gap: 24px;
+  padding-top: 24px;
+}
+
+.device {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+
+/* The device card is the one marked object on the page: two white corners. */
+.device-card {
+  position: relative;
+  display: grid;
+  gap: 18px;
+}
+
+.device-card::before,
+.device-card::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: solid var(--ink);
+  pointer-events: none;
+}
+
+.device-card::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.device-card::after {
+  right: -1px;
+  bottom: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+.device-card:empty {
+  display: none;
+}
+
+.device-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.device-art {
+  flex: none;
+  width: 124px;
+}
+
+.device-id {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.battery {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.battery-level {
+  color: var(--ink);
+  font-size: 68px;
+  line-height: 0.82;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.battery-unit {
+  margin-left: 4px;
+  font-size: 30px;
+}
+
+.device-name {
+  font-size: 18px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.device-note {
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.device-card .button {
+  flex: 1 1 auto;
+  min-height: 42px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.device-details {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.device-details > summary {
+  color: var(--mute);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.registers {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 20px;
+  font-size: 14px;
+}
+
+.registers dt {
+  color: var(--mute);
+}
+
+.registers dd {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* A reading that just changed arrives in inverse video, then settles. */
+.changed {
+  animation: arrive 1s steps(4, end);
+}
+
+@keyframes arrive {
+  from {
+    background: var(--ink);
+    color: var(--void);
+  }
+}
+
+.device-details .footnote {
+  margin-top: 12px;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.option {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--void);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.option[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--void);
+}
+
+.inline-form {
+  display: grid;
+  gap: 10px;
+  color: var(--mute);
+  font-size: 14px;
+}
+
+.inline-form-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--void);
+  color: var(--ink);
+}
+
+.inline-form input::placeholder {
+  color: var(--faint);
+}
+
+.inline-form .button {
+  min-height: 42px;
+}
+
+/* ── Settings: a picture, a guide, then the controls ────────────────────── */
+
+.settings {
+  min-width: 0;
+}
+
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.jump a {
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.jump a:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.feature {
+  border: 1px solid var(--line);
+  background: var(--void);
+  /* Clear of the sticky bar when jumped to. */
+  scroll-margin-top: 72px;
+}
+
+.feature-art {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--well);
+}
+
+.feature-text {
+  display: grid;
+  gap: 10px;
+  padding: 18px 18px 16px;
+}
+
+.feature-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.guide-lead {
+  max-width: 52ch;
+}
+
+.guide-points {
+  display: grid;
+  gap: 6px;
+  max-width: 54ch;
+  color: var(--mute);
+  font-size: 14px;
+  list-style: none;
+}
+
+.guide-points li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.guide-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  background: var(--line-strong);
+}
+
+.rows {
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-height: 60px;
+  padding: 13px 18px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+
+.row-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.row-title,
+.switch {
+  font-weight: 600;
+}
+
+.row-note {
+  max-width: 46ch;
+  color: var(--mute);
+  font-size: 13px;
+}
+
+.alarm-text {
+  color: var(--red);
+}
+
+/* The switch is a plain button whose hit area is stretched over its row. */
+.switch-row .row-text {
+  padding-right: 62px;
+}
+
+.switch {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.switch:focus-visible {
+  outline: none;
+}
+
+.row:has(.switch:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.row:has(.switch:hover) {
+  background: var(--well);
+}
+
+.track {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  width: 46px;
+  height: 24px;
+  margin-top: -12px;
+  border: 1px solid var(--line-strong);
+  background: var(--void);
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--faint);
+}
+
+.switch[aria-checked='true'] .track {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.switch[aria-checked='true'] .knob {
+  background: var(--void);
+  transform: translateX(22px);
+}
+
+.switch[aria-checked='mixed'] .track {
+  border-style: dashed;
+}
+
+.switch[aria-checked='mixed'] .knob {
+  opacity: 0.5;
+  transform: translateX(11px);
+}
+
+/* Controls are rebuilt on each reading, so a change is replayed as motion. */
+.switch.turned[aria-checked='true'] .knob {
+  animation: knob-on 0.16s steps(4, end);
+}
+
+.switch.turned[aria-checked='false'] .knob {
+  animation: knob-off 0.16s steps(4, end);
+}
+
+@keyframes knob-on {
+  from {
+    transform: translateX(0);
+  }
+}
+
+@keyframes knob-off {
+  from {
+    transform: translateX(22px);
+  }
+}
+
+.segmented {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line-strong);
+}
+
+.segment {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--void);
+  color: var(--mute);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.segment + .segment {
+  border-left: 1px solid var(--line-strong);
+}
+
+.segment:hover {
+  color: var(--ink);
+}
+
+.segment[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--void);
+}
+
+.segment.turned {
+  animation: chosen 0.2s steps(2, end);
+}
+
+@keyframes chosen {
+  from {
+    background: var(--line-strong);
+  }
+}
+
+.find-row .button {
+  min-height: 42px;
+}
+
+.settings-pane > .footnote {
+  margin-top: 18px;
+}
+
+/* ── Toasts ─────────────────────────────────────────────────────────────── */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 20;
+  width: max-content;
+  max-width: min(92vw, 440px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  padding: 11px 16px;
+  border: 1px solid var(--ink);
+  background: var(--void);
+  font-size: 14px;
+  font-weight: 500;
+  animation: rise 0.16s steps(3, end);
+}
+
+.toast.error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.colophon {
+  display: grid;
+  gap: 6px;
+  margin-top: 72px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.colophon code,
+.colophon a {
+  color: var(--mute);
+}
+
+.noscript {
+  margin: 24px;
+  color: var(--red);
+}
+
+/* ── Other widths ───────────────────────────────────────────────────────── */
+
+@media (max-width: 559px) {
+  .bar-device {
+    display: none;
+  }
+
+  .device-hero {
+    gap: 16px;
+  }
+
+  .device-art {
+    width: 104px;
+  }
+
+  .battery-level {
+    font-size: 58px;
+  }
+}
+
+@media (min-width: 900px) {
+  .intro {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 64px;
+    padding-top: 56px;
+  }
+
+  .orb {
+    width: 300px;
+  }
+
+  .guide {
+    padding-top: 12px;
+  }
+}
+
+@media (min-width: 960px) {
+  .workspace {
+    grid-template-columns: minmax(340px, 380px) minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+    padding-top: 36px;
+  }
+
+  .device {
+    position: sticky;
+    top: 80px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
