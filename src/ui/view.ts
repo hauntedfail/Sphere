@@ -62,8 +62,13 @@ function titleDevice(state: AppState): string {
   return `${device.kind === 'simulated' ? 'simulated ' : ''}${modelLabel(device.model)}${label}`;
 }
 
+/**
+ * Bind the page to `app`. A page is bound once: binding adds listeners and a
+ * few elements, so a second call is refused before it touches anything.
+ */
 export function mount(app: App): void {
   const main = byId('main');
+  if (main.dataset['mounted'] !== undefined) throw new Error('this page is already mounted');
   const bar = byId('bar');
   const intro = byId('intro');
   const workspace = byId('workspace');
@@ -239,4 +244,5 @@ export function mount(app: App): void {
 
   app.store.subscribe(draw);
   draw(app.store.get(), null);
+  main.dataset['mounted'] = '';
 }

@@ -541,6 +541,20 @@ describe('workspace', () => {
     expect(document.getElementById('save-label')).toBeNull();
   });
 
+  it('refuses to bind the same page twice, and leaves it as it was', () => {
+    const page = open();
+    expect(() => mount(page.app)).toThrow(/already mounted/);
+    expect(document.querySelectorAll('#demo-button')).toHaveLength(1);
+    expect(document.querySelectorAll('.card-lead')).toHaveLength(1);
+    expect(document.querySelectorAll('.model-tile')).toHaveLength(6);
+    expect(document.querySelectorAll('#sphere canvas')).toHaveLength(1);
+  });
+
+  it('binds a fresh page after an earlier one', () => {
+    open();
+    expect(() => open()).not.toThrow();
+  });
+
   it('fails loudly when the page skeleton is not what the code expects', () => {
     document.body.innerHTML = BODY.replace('id="toasts"', 'id="elsewhere"');
     const app = new App({
