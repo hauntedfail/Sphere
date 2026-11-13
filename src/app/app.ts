@@ -3,7 +3,8 @@
  *
  * Buttons and the console prompt both go through `run(line)`, so every action
  * has one implementation and leaves the same trace. Nothing here touches the
- * DOM, which keeps the whole thing testable against the simulator.
+ * DOM, which keeps the whole thing testable against the simulator. The
+ * simulator itself is handed in, so a build that leaves it out has none.
  */
 import { parseCommand, type ConnectTarget } from '../console/parse';
 import { Iqos } from '../device/iqos';
@@ -17,9 +18,8 @@ import {
   saveBook,
   withLast,
 } from '../storage/devices';
-import type { BluetoothGateway, DeviceLink, LinkHooks } from '../transport/link';
+import type { BluetoothGateway, DeviceLink, LinkHooks, SimulatorGateway } from '../transport/link';
 import type { WireEvent } from '../transport/session';
-import { SimulatedDevice, openSimulatedLink } from '../transport/simulator';
 import { toHex } from '../protocol/bytes';
 import { runCommand, refreshDevice } from './commands';
 import {
@@ -39,8 +39,8 @@ export interface AppDeps {
   readonly bluetooth: BluetoothGateway | null;
   readonly version: string;
   readonly now?: () => number;
-  /** Reply delay of the simulated device. */
-  readonly simulatorLatencyMs?: number;
+  /** The simulated device. Debug builds pass one; production builds do not. */
+  readonly simulator?: SimulatorGateway | null;
 }
 
 export type FieldKey =
@@ -67,18 +67,11 @@ const MAX_WIRE_LINES = 400;
 /** Lines that end the connection. They run at once instead of queueing. */
 const HANG_UP = /^\s*(disconnect|exit|quit)\s*$/i;
 
-const SIMULATED_NAMES: Record<Exclude<DeviceModel, 'unknown'>, string> = {
-  iluma: 'IQOS ILUMA',
-  'iluma-one': 'IQOS ILUMA ONE',
-  'iluma-prime': 'IQOS ILUMA PRIME',
-  'iluma-i': 'IQOS ILUMA i',
-  'iluma-i-one': 'IQOS ILUMA i ONE',
-  'iluma-i-prime': 'IQOS ILUMA i PRIME',
-};
-
 export class App {
   readonly store: Store<AppState>;
   readonly version: string;
+  /** Whether this build can open a simulated device. */
+  readonly canSimulate: boolean;
 
   private link: DeviceLink | null = null;
   private iqos: Iqos | null = null;
@@ -90,6 +83,7 @@ export class App {
 
   constructor(private readonly deps: AppDeps) {
     this.version = deps.version;
+    this.canSimulate = (deps.simulator ?? null) !== null;
     this.now = deps.now ?? Date.now;
     const support = deps.bluetooth?.support() ?? 'unsupported';
     this.store = createStore(initialState(support, loadBook(deps.storage)));
@@ -134,7 +128,11 @@ export class App {
   session(): Session {
     const { device } = this.store.get();
     if (this.link === null || this.iqos === null || device === null) {
-      throw usageError('Not connected. Run connect, or demo to try a simulated device.');
+      throw usageError(
+        this.canSimulate
+          ? 'Not connected. Run connect, or demo to try a simulated device.'
+          : 'Not connected. Run connect first.',
+      );
     }
     return { iqos: this.iqos, link: this.link, device };
   }
@@ -209,11 +207,11 @@ export class App {
   }
 
   async demo(model: DeviceModel = 'iluma-i'): Promise<void> {
+    const simulator = this.deps.simulator ?? null;
+    if (simulator === null) throw usageError('The simulated device is only part of debug builds.');
     this.requireIdle();
-    const name = model === 'unknown' ? 'IQOS' : SIMULATED_NAMES[model];
-    const device = new SimulatedDevice({ name, latencyMs: this.deps.simulatorLatencyMs ?? 60 });
     const generation = ++this.generation;
-    await this.attach(openSimulatedLink(device, this.hooks(generation)), generation);
+    await this.attach(simulator.open(model, this.hooks(generation)), generation);
   }
 
   /** Close the connection, stopping Find My IQOS first so it does not buzz on. */

@@ -1,4 +1,5 @@
 import type { DeviceInfo } from '../protocol/gatt';
+import type { DeviceModel } from '../protocol/model';
 import type { Transport, WireEvent } from './session';
 
 /** A connected device: an SCP transport plus what GATT offers besides it. */
@@ -28,6 +29,15 @@ export interface OpenRequest {
   readonly known?: { readonly id: string; readonly name: string };
   /** List every nearby device instead of only IQOS ones. */
   readonly acceptAll?: boolean;
+}
+
+/**
+ * Opens simulated devices. Only debug builds wire one in, so a production
+ * bundle carries no simulator at all.
+ */
+export interface SimulatorGateway {
+  /** Open a simulated `model`. `unknown` is a device whose name names no model. */
+  open(model: DeviceModel, hooks: LinkHooks): DeviceLink;
 }
 
 /** How the app reaches real hardware. Absent in tests and unsupported browsers. */

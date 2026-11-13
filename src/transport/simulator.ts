@@ -2,7 +2,8 @@
  * A simulated IQOS that answers SCP frames in memory.
  *
  * It exists so the interface can be explored without hardware and so the
- * session, framing and command layers can be tested end to end. Read replies
+ * session, framing and command layers can be tested end to end. Only debug
+ * builds include it: `main.ts` is the one place that decides. Read replies
  * follow frames captured from an ILUMA i. Three things are invented, because
  * no capture shows them: the acknowledgement sent after a classic write, the
  * life-data frame, and every identifier (product numbers, firmware bytes).
@@ -16,7 +17,7 @@ import {
   frameError,
   usesCrc16,
 } from '../protocol/scp';
-import type { DeviceLink, LinkHooks } from './link';
+import type { DeviceLink, LinkHooks, SimulatorGateway } from './link';
 import { ScpSession, type ScpPort } from './session';
 
 export interface SimulatorState {
@@ -275,6 +276,30 @@ export class SimulatedDevice implements ScpPort {
     if (settingId === 0x04) return this.state.smartGesture;
     return null;
   }
+}
+
+/** The name each model advertises, which is how the app tells them apart. */
+const ADVERTISED_NAMES: Record<Exclude<DeviceModel, 'unknown'>, string> = {
+  iluma: 'IQOS ILUMA',
+  'iluma-one': 'IQOS ILUMA ONE',
+  'iluma-prime': 'IQOS ILUMA PRIME',
+  'iluma-i': 'IQOS ILUMA i',
+  'iluma-i-one': 'IQOS ILUMA i ONE',
+  'iluma-i-prime': 'IQOS ILUMA i PRIME',
+};
+
+/** Reply delay that lets the interface show work in progress. */
+const DEFAULT_LATENCY_MS = 60;
+
+/** The simulator as the app sees it: a place to open simulated devices. */
+export function createSimulator(options: { readonly latencyMs?: number } = {}): SimulatorGateway {
+  const latencyMs = options.latencyMs ?? DEFAULT_LATENCY_MS;
+  return {
+    open: (model, hooks) => {
+      const name = model === 'unknown' ? 'IQOS' : ADVERTISED_NAMES[model];
+      return openSimulatedLink(new SimulatedDevice({ name, latencyMs }), hooks);
+    },
+  };
 }
 
 /** Open a link to a simulated device, shaped like a Bluetooth one. */

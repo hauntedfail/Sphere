@@ -39,13 +39,23 @@ function cspMeta(): Plugin {
   };
 }
 
-export default defineConfig({
+/**
+ * The simulated device is a development aid. Exactly two things get it: the
+ * dev server, and `vite build --mode debug` (`pnpm build:debug`), which
+ * writes to its own directory so it is never mistaken for the site. Every
+ * other build, whatever its mode is called, is built without it.
+ */
+const DEBUG_MODE = 'debug';
+
+export default defineConfig(({ command, mode }) => ({
   base: './',
   plugins: [cspMeta()],
   define: {
     __APP_VERSION__: JSON.stringify(version),
+    __SIMULATOR__: JSON.stringify(command === 'serve' || mode === DEBUG_MODE),
   },
   build: {
+    outDir: mode === DEBUG_MODE ? 'dist-debug' : 'dist',
     target: 'es2022',
     sourcemap: false,
     modulePreload: { polyfill: false },
@@ -61,4 +71,4 @@ export default defineConfig({
       thresholds: { lines: 80, functions: 80, statements: 80, branches: 75 },
     },
   },
-});
+}));

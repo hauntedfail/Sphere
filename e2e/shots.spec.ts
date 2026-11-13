@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
 
-/** Not assertions: screenshots for reviewing the design by eye. */
+/** Not assertions: screenshots for reviewing the design by eye. Runs on the debug build. */
 test('screenshots', async ({ page }, info) => {
   test.skip(process.env['SHOTS'] === undefined, 'set SHOTS=1 to capture screenshots');
   const shot = (name: string) =>
@@ -22,5 +22,4 @@ test('screenshots', async ({ page }, info) => {
   await page.getByRole('button', { name: 'Stop vibrating' }).waitFor();
   await page.waitForTimeout(200);
   await shot('3-busy');
-
 });

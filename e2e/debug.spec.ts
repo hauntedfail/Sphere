@@ -1,24 +1,19 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import {
+  SIMULATOR_MARKERS,
+  bundleCode,
+  expect,
+  expectNoSidewaysScroll,
+  expectSecurityPolicy,
+  test,
+  toasts,
+} from './support';
 
 /**
- * Critical flows against the production build, using the simulated device.
- * Every test also fails on a console error or a CSP violation.
+ * The debug build (`pnpm build:debug`), which carries the simulated device.
+ * These are the flows that need a device to talk to. The debug build keeps
+ * the production security policy, so they run under it too.
  */
-
-const problems = new WeakMap<Page, string[]>();
-
-test.beforeEach(async ({ page }) => {
-  const seen: string[] = [];
-  problems.set(page, seen);
-  page.on('console', (message) => {
-    if (message.type() === 'error' || message.type() === 'warning') seen.push(message.text());
-  });
-  page.on('pageerror', (error) => seen.push(error.message));
-});
-
-test.afterEach(async ({ page }) => {
-  expect(problems.get(page) ?? [], 'console errors and CSP violations').toEqual([]);
-});
 
 async function connectSimulator(page: Page): Promise<void> {
   await page.goto('/');
@@ -26,65 +21,18 @@ async function connectSimulator(page: Page): Promise<void> {
   await expect(page.locator('#title-state')).toHaveText('ready');
 }
 
-const toasts = (page: Page) => page.locator('#toasts');
-
-async function expectNoSidewaysScroll(page: Page): Promise<void> {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow, 'horizontal overflow in px').toBeLessThanOrEqual(0);
-}
-
-test('loads under its security policy without leaving its origin', async ({ page, baseURL }) => {
-  const requests: string[] = [];
-  page.on('request', (request) => requests.push(request.url()));
-
+test('carries the simulator under the same security policy', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Sphere' })).toBeVisible();
-  await expect(page.locator('#version')).toHaveText(/^\d+\.\d+\.\d+$/);
-  // The globe is drawn, not downloaded: some of its dots must be lit.
-  const litPixels = await page.locator('#sphere canvas').evaluate((canvas: HTMLCanvasElement) => {
-    const data = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data ?? [];
-    let lit = 0;
-    for (let index = 3; index < data.length; index += 4) if ((data[index] ?? 0) > 200) lit++;
-    return lit;
-  });
-  expect(litPixels).toBeGreaterThan(1000);
-  // Sphere is a control surface: there is no console to type into.
-  await expect(page.locator('input')).toHaveCount(0);
-
-  const policy = await page
-    .locator('meta[http-equiv="Content-Security-Policy"]')
-    .getAttribute('content');
-  expect(policy).toContain("default-src 'none'");
-  expect(policy).toContain("connect-src 'none'");
-  expect(policy).toContain("script-src 'self'");
-  expect(policy).toContain("require-trusted-types-for 'script'");
-
-  expect(requests.length).toBeGreaterThan(2);
-  for (const url of requests) expect(url.startsWith(baseURL ?? ''), url).toBe(true);
+  await expectSecurityPolicy(page);
+  await expect(page.getByRole('button', { name: 'Try a simulated device' })).toBeVisible();
+  await expect(page.locator('button.model-tile')).toHaveCount(6);
   await expectNoSidewaysScroll(page);
-});
 
-test('the policy really blocks network requests and inline script', async ({ page }) => {
-  await page.goto('/');
-  const blocked = await page.evaluate(async () => {
-    const violations: string[] = [];
-    document.addEventListener('securitypolicyviolation', (event) => {
-      violations.push(event.effectiveDirective);
-    });
-    const fetched = await fetch('https://example.com/').then(
-      () => 'allowed',
-      () => 'blocked',
-    );
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    return { fetched, violations };
-  });
-  expect(blocked.fetched).toBe('blocked');
-  expect(blocked.violations).toContain('connect-src');
-
-  // The probe above is expected to complain; it is not a defect.
-  problems.set(page, []);
+  // The markers the production build is checked against are real: they are here.
+  const code = bundleCode('dist-debug');
+  for (const marker of SIMULATOR_MARKERS) {
+    expect(code.includes(marker), `"${marker}" in the debug bundle`).toBe(true);
+  }
 });
 
 test('connects to the simulated device and reads it', async ({ page }) => {
@@ -209,43 +157,13 @@ test('draws the connected model, and a different one for each', async ({ page })
   expect(kit).not.toBe(allInOne);
 });
 
-test('keeps saved devices across visits and can forget them', async ({ page }) => {
-  await page.addInitScript(() => {
-    if (sessionStorage.getItem('seeded') !== null) return;
-    sessionStorage.setItem('seeded', '1');
-    const device = { id: 'opaque-id', name: 'IQOS ILUMA i', model: 'iluma-i' };
-    localStorage.setItem('sphere.devices.v1', JSON.stringify({ last: device, devices: { minera: device } }));
-  });
-  await page.goto('/');
-
-  const saved = page.locator('#saved-devices');
-  await expect(saved).toContainText('minera');
-  await expect(saved).toContainText('Last connected: IQOS ILUMA i');
-
-  await saved.getByRole('button', { name: 'Forget' }).click();
-  await expect(toasts(page)).toHaveText('Removed device label: minera');
-
-  await page.reload();
-  await expect(page.locator('#saved-devices')).not.toContainText('minera');
-  await expect(page.locator('#saved-devices')).toContainText('Last connected');
-});
-
-test('never renders stored text as markup', async ({ page }) => {
-  await page.addInitScript(() => {
-    const device = { id: 'x', name: '<img src=x onerror=alert(1)>', model: 'iluma-i' };
-    localStorage.setItem('sphere.devices.v1', JSON.stringify({ last: device, devices: { ok: device } }));
-  });
-  await page.goto('/');
-  await expect(page.locator('#saved-devices')).toContainText('<img src=x onerror=alert(1)>');
-  expect(await page.locator('#saved-devices img').count()).toBe(0);
-});
-
-test('says so when the browser has no Web Bluetooth', async ({ page }) => {
+test('keeps the simulator when the browser has no Web Bluetooth', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'bluetooth', { get: () => undefined });
   });
   await page.goto('/');
-  await expect(page.locator('#support-notice')).toContainText('no Web Bluetooth');
+  await expect(page.locator('#support-notice')).toContainText('The simulated device still works here.');
   await expect(page.getByRole('button', { name: 'Connect a device' })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Try a simulated device' })).toBeVisible();
+  await page.getByRole('button', { name: 'Try a simulated device' }).click();
+  await expect(page.locator('#title-state')).toHaveText('ready');
 });

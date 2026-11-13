@@ -19,9 +19,15 @@ function openStorage(): KeyValueStore {
   }
 }
 
+// `__SIMULATOR__` is a build-time constant. Where it is false the bundler
+// drops this branch, and the import inside it, so the simulator is not part
+// of the build at all. Where it is true the simulator loads as its own chunk.
+const simulator = __SIMULATOR__ ? (await import('./transport/simulator')).createSimulator() : null;
+
 const app = new App({
   storage: openStorage(),
   bluetooth: createBluetoothGateway(),
+  simulator,
   version: __APP_VERSION__,
 });
 

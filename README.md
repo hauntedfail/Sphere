@@ -25,11 +25,30 @@ Open the page in Chrome, Edge or Opera (desktop or Android). Wake the device,
 close the IQOS app, press **Connect a device** and pick it from the browser's
 list. The first connection asks the operating system to pair.
 
-No device at hand, or a browser without Web Bluetooth? **Try a simulated
-device** runs everything against an in-memory IQOS.
+No device at hand, or a browser without Web Bluetooth? The dev server carries
+a simulated device: **Try a simulated device** runs everything against an
+in-memory IQOS. See [Debug builds](#debug-builds).
 
 To publish, run `pnpm build` and upload `dist/` to any static host that serves
-HTTPS. Web Bluetooth only works on a secure origin.
+HTTPS. Web Bluetooth only works on a secure origin. The published site has no
+simulator.
+
+## Debug builds
+
+The simulated device is a development aid, so it is compiled in only outside
+production:
+
+| Command | Simulator | Output |
+|---|---|---|
+| `pnpm dev` | yes | dev server |
+| `pnpm build:debug` | yes | `dist-debug/` |
+| `pnpm build` | no | `dist/` |
+
+`vite.config.ts` defines the constant `__SIMULATOR__` from the build mode, and
+`src/main.ts` is the only code that reads it. In a production build the
+bundler drops that branch and the simulator module with it: no button, no
+`demo` command, and no simulator code in the bundle. The end-to-end tests
+check all three. A debug build keeps the production security policy.
 
 ## The page
 
@@ -44,8 +63,9 @@ Connected, the page shows the device and its settings.
   under them the switch or choice. Settings the device reports follow the
   device; the two it does not report (Smart gesture and lock) mark nothing
   until you choose, then show what was last set here.
-- **Supported models** on the start page are buttons: each starts the
-  simulator as that model.
+- **Supported models** on the start page shows each model's drawing. In a
+  debug build the drawings are buttons: each starts the simulator as that
+  model.
 
 The outcome of a click appears as a short notice at the bottom of the page.
 There is no console. For a bug report, **Details → Copy session log** copies
@@ -85,7 +105,7 @@ connect buttons and the model tiles run):
 | `connect <label>` | Reconnect to a saved device |
 | `connect --last` | Reconnect to the most recent device |
 | `connect --all` | List every nearby device, for names Sphere does not expect |
-| `demo [model]` | Connect to a simulated device |
+| `demo [model]` | Connect to a simulated device (debug builds only) |
 | `model <model>` | Say which model this is when its name does not |
 | `refresh` | Read every setting again |
 | `disconnect`, `exit`, `quit` | Close the connection |
@@ -145,7 +165,7 @@ src/
                response parsers, model capability matrix. Pure functions.
   transport/   session.ts        request/response over any notify channel
                web-bluetooth.ts  the only code that touches navigator.bluetooth
-               simulator.ts      an in-memory IQOS for demo mode and tests
+               simulator.ts      an in-memory IQOS for debug builds and tests
   device/      iqos.ts           typed operations, same sequences as the crate
   console/     the command grammar the controls speak
   storage/     saved device labels
@@ -162,7 +182,7 @@ Every control goes through one path, `app.run(line)`, so each action has a
 single implementation. Nothing above `ui/` touches the DOM.
 
 TypeScript, Vite, no framework and no runtime dependencies. The production
-build is about 23 kB of JavaScript and 4 kB of CSS gzipped, plus two fonts
+build is about 21 kB of JavaScript and 4 kB of CSS gzipped, plus two fonts
 (36 kB together), all served from the page's own origin.
 
 The stylesheet's opening comment describes the visual system: black, white
@@ -175,7 +195,7 @@ labels. The page sets no inline styles, so `style-src 'self'` holds.
 pnpm typecheck   # strict TypeScript
 pnpm test        # unit and DOM tests (Vitest)
 pnpm coverage    # the same, with coverage thresholds
-pnpm e2e         # Playwright against the production build
+pnpm e2e         # Playwright against the production and debug builds
 pnpm check       # all of the above
 ```
 
@@ -196,8 +216,10 @@ What the tests establish:
 - Every picture is a pure function of position and time, tested as one: each
   model draws differently, and each guide picture follows its setting.
 - In a real browser, on desktop and phone viewports: the security policy
-  holds, no request leaves the origin, the flows work by mouse and by
-  keyboard, and stored or typed text is never rendered as markup.
+  holds, no request leaves the origin, and stored or typed text is never
+  rendered as markup. The production build has no simulator, on the page or
+  in the bundle. The device flows, by mouse and by keyboard, run against the
+  debug build.
 
 What they do not establish: that a physical device accepts all of this. The
 simulator's read replies follow real captures, but its write acknowledgements
@@ -215,7 +237,7 @@ market.
 | Browser | Works |
 |---|---|
 | Chrome, Edge, Opera on Windows, macOS, Linux, ChromeOS, Android | yes |
-| Firefox, Safari, every browser on iOS | no Web Bluetooth; the simulator still runs |
+| Firefox, Safari, every browser on iOS | no Web Bluetooth; only a debug build's simulator runs |
 
 On Linux, Chrome needs BlueZ 5.41 or later.
 

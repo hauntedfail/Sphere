@@ -818,22 +818,29 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
   return children;
 }
 
-/** One tile per supported model, each starting the simulator as that model. */
-export function modelTiles(stage: Stage, run: Run): Child[] {
-  return KNOWN_MODELS.map((model) =>
-    h(
+/**
+ * One tile per supported model. With a simulator (`simulate`), each tile is a
+ * button that starts it as that model; without one, the tiles are pictures.
+ */
+export function modelTiles(stage: Stage, simulate: Run | null): Child[] {
+  return KNOWN_MODELS.map((model) => {
+    const content: Child[] = [
+      stage.screen(`tile-${model}`, DEVICE_COLUMNS, DEVICE_ROWS, deviceScene(model, { level: 72, finding: false }))
+        .element,
+      h('span', { class: 'model-name' }, modelLabel(model)),
+    ];
+    if (simulate === null) return h('div', { class: 'model-tile' }, ...content);
+    return h(
       'button',
       {
         class: 'model-tile',
         key: `tile-${model}`,
         attrs: { type: 'button', title: `Try a simulated ${modelLabel(model)}` },
-        on: { click: () => run(`demo ${model}`) },
+        on: { click: () => simulate(`demo ${model}`) },
       },
-      stage.screen(`tile-${model}`, DEVICE_COLUMNS, DEVICE_ROWS, deviceScene(model, { level: 72, finding: false }))
-        .element,
-      h('span', { class: 'model-name' }, modelLabel(model)),
-    ),
-  );
+      ...content,
+    );
+  });
 }
 
 // ── Saved devices (shown while disconnected) ────────────────────────────────

@@ -18,7 +18,7 @@ import {
 export async function runCommand(app: App, command: Command): Promise<void> {
   switch (command.name) {
     case 'help':
-      return app.print(helpLines(app.store.get().device?.model ?? null).join('\n'));
+      return app.print(helpLines(app.store.get().device?.model ?? null, app.canSimulate).join('\n'));
     case 'version':
       return app.print(`sphere ${app.version}`);
     case 'clear':

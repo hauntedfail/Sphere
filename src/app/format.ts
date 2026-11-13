@@ -84,15 +84,18 @@ export function formatSavedDevices(book: DeviceBook): string[] {
   });
 }
 
-/** `help` output. With no device connected, every command is listed. */
-export function helpLines(model: DeviceModel | null): string[] {
+/**
+ * `help` output. With no device connected, every command is listed. `demo`
+ * is listed only where the build has a simulator to run it.
+ */
+export function helpLines(model: DeviceModel | null, simulator: boolean): string[] {
   const has = (capability: Parameters<typeof supports>[1]): boolean =>
     model === null || supports(model, capability);
 
   const lines = [
     'Available commands:',
     '  connect [label|--last|--all]   Connect over Bluetooth',
-    '  demo [model]                   Connect to a simulated device',
+    ...(simulator ? ['  demo [model]                   Connect to a simulated device'] : []),
     '  disconnect                     Close the connection',
     '  battery                        Display battery level',
     '  device [list|save|remove]      Manage saved device labels',

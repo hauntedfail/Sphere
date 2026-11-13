@@ -599,10 +599,14 @@ main:focus {
   padding: 12px 6px 10px;
   border: 1px solid var(--line);
   background: var(--void);
+}
+
+/* A tile is a button only where the build can simulate that model. */
+button.model-tile {
   cursor: pointer;
 }
 
-.model-tile:hover {
+button.model-tile:hover {
   border-color: var(--ink);
 }
 

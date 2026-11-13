@@ -20,10 +20,11 @@ import { GLOBE_SIZE, globeScene } from './scenes';
 const SUPPORT_NOTICE: Record<AppState['support'], string> = {
   ok: '',
   unsupported:
-    'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android. The simulated device still works here.',
-  insecure:
-    'Bluetooth only works on a secure page. Open Sphere over HTTPS or from localhost. The simulated device still works here.',
+    'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android.',
+  insecure: 'Bluetooth only works on a secure page. Open Sphere over HTTPS or from localhost.',
 };
+/** Added to a support notice in builds that carry the simulator. */
+const SIMULATOR_STILL_WORKS = ' The simulated device still works here.';
 
 /** Which parts of the state each region depends on. */
 const DEVICE_KEYS = ['device', 'battery', 'status', 'diagnosis', 'finding'] as const;
@@ -72,7 +73,6 @@ export function mount(app: App): void {
   const connectButton = byId('connect-button', HTMLButtonElement);
   const connectAllButton = byId('connect-all-button', HTMLButtonElement);
   const connectAllRow = byId('connect-all-row');
-  const demoButton = byId('demo-button', HTMLButtonElement);
   const savedContainer = byId('saved-devices');
   const deviceContainer = byId('device-pane');
   const saveContainer = byId('save-pane');
@@ -155,8 +155,21 @@ export function mount(app: App): void {
 
   connectButton.addEventListener('click', () => run('connect'));
   connectAllButton.addEventListener('click', () => run('connect --all'));
-  demoButton.addEventListener('click', () => run('demo'));
-  redraw(byId('model-tiles'), modelTiles(stage, run));
+  const connectControls: HTMLElement[] = [connectButton, connectAllButton];
+
+  // The simulator's controls exist only in builds that carry the simulator.
+  const tiles = byId('model-tiles');
+  if (app.canSimulate) {
+    const demoButton = h(
+      'button',
+      { class: 'button', attrs: { type: 'button', id: 'demo-button' }, on: { click: () => run('demo') } },
+      'Try a simulated device',
+    );
+    connectButton.after(demoButton);
+    connectControls.push(demoButton);
+    tiles.before(h('p', { class: 'card-lead' }, 'No device at hand? Pick a model to try it simulated.'));
+  }
+  redraw(tiles, modelTiles(stage, app.canSimulate ? run : null));
 
   // ── Drawing ───────────────────────────────────────────────────────────────
 
@@ -170,7 +183,7 @@ export function mount(app: App): void {
 
       const connecting = state.phase === 'connecting';
       connectButton.textContent = connecting ? 'Connecting' : 'Connect a device';
-      for (const control of [connectButton, connectAllButton, demoButton]) {
+      for (const control of connectControls) {
         control.setAttribute('aria-disabled', String(connecting));
       }
       // Moving between the intro and the workspace removes whatever had
@@ -185,7 +198,9 @@ export function mount(app: App): void {
     if (previous !== null && previous.busy === 0 && state.busy > 0) commitMemory(ui.memory);
 
     if (changed(state, previous, ['support'])) {
-      supportNotice.textContent = SUPPORT_NOTICE[state.support];
+      const notice = SUPPORT_NOTICE[state.support];
+      supportNotice.textContent =
+        notice !== '' && app.canSimulate ? `${notice}${SIMULATOR_STILL_WORKS}` : notice;
       supportNotice.hidden = state.support === 'ok';
       connectButton.hidden = state.support !== 'ok';
       connectAllButton.hidden = state.support !== 'ok';

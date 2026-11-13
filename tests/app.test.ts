@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/app';
 import type { AppState } from '../src/app/state';
+import { KNOWN_MODELS, modelFromLocalName } from '../src/protocol/model';
 import { STORAGE_KEY, type KeyValueStore } from '../src/storage/devices';
 import type {
   BluetoothGateway,
@@ -9,7 +10,12 @@ import type {
   LinkHooks,
   OpenRequest,
 } from '../src/transport/link';
-import { SimulatedDevice, openSimulatedLink, type SimulatorOptions } from '../src/transport/simulator';
+import {
+  SimulatedDevice,
+  createSimulator,
+  openSimulatedLink,
+  type SimulatorOptions,
+} from '../src/transport/simulator';
 
 class MemoryStore implements KeyValueStore {
   readonly data = new Map<string, string>();
@@ -63,9 +69,19 @@ interface Harness {
   run: (...lines: string[]) => Promise<string[]>;
 }
 
-function harness(bluetooth: FakeBluetooth | null = new FakeBluetooth()): Harness {
+/** `simulator: false` builds the app the way a production build does. */
+function harness(
+  bluetooth: FakeBluetooth | null = new FakeBluetooth(),
+  options: { simulator?: boolean } = {},
+): Harness {
   const storage = new MemoryStore();
-  const app = new App({ storage, bluetooth, version: '9.9.9', simulatorLatencyMs: 0, now: () => 1000 });
+  const app = new App({
+    storage,
+    bluetooth,
+    version: '9.9.9',
+    simulator: options.simulator === false ? null : createSimulator({ latencyMs: 0 }),
+    now: () => 1000,
+  });
   let seen = 0;
   const output = (): string[] => {
     const lines = app.store.get().console.filter((line) => line.id > seen);
@@ -554,5 +570,62 @@ describe('simulated device', () => {
     await done;
     expect(h.state().busy).toBe(0);
     expect(h.output().slice(-2)).toEqual(['Brightness set to low', 'Brightness: low']);
+  });
+});
+
+describe('without the simulator (production builds)', () => {
+  it('says whether a simulated device can be opened', () => {
+    expect(harness().app.canSimulate).toBe(true);
+    expect(harness(null, { simulator: false }).app.canSimulate).toBe(false);
+  });
+
+  it('refuses demo and stays idle', async () => {
+    const h = harness(null, { simulator: false });
+    expect(await h.run('demo')).toEqual(['The simulated device is only part of debug builds.']);
+    expect(await h.run('demo iluma-prime')).toEqual(['The simulated device is only part of debug builds.']);
+    expect(h.state().phase).toBe('idle');
+    expect(h.state().device).toBeNull();
+  });
+
+  it('does not point a disconnected user at demo', async () => {
+    const h = harness(new FakeBluetooth(), { simulator: false });
+    expect(await h.run('battery')).toEqual(['Not connected. Run connect first.']);
+  });
+
+  it('lists demo in help only when it exists', async () => {
+    const withSimulator = (await harness().run('help')).join('\n');
+    const without = (await harness(null, { simulator: false }).run('help')).join('\n');
+    expect(withSimulator).toMatch(/^ {2}demo \[model\]/m);
+    expect(without).not.toMatch(/demo/);
+    expect(without).toMatch(/^ {2}connect \[label\|--last\|--all\]/m);
+  });
+
+  it('still connects over Bluetooth', async () => {
+    const h = harness(new FakeBluetooth(), { simulator: false });
+    await h.run('connect');
+    expect(h.state().phase).toBe('connected');
+    expect(h.state().device?.kind).toBe('ble');
+  });
+});
+
+describe('createSimulator', () => {
+  it('opens a simulated link that advertises the model asked for', async () => {
+    const reasons: string[] = [];
+    const link = createSimulator({ latencyMs: 0 }).open('iluma-one', {
+      onDisconnect: (reason) => reasons.push(reason),
+    });
+    expect(link.kind).toBe('simulated');
+    expect(link.name).toBe('IQOS ILUMA ONE');
+    expect(await link.readBatteryLevel()).toBe(85);
+    link.disconnect();
+    expect(reasons).toEqual(['disconnected']);
+  });
+
+  it('advertises a name the app recognises for every known model', () => {
+    const simulator = createSimulator();
+    for (const model of KNOWN_MODELS) {
+      expect(modelFromLocalName(simulator.open(model, {}).name)).toBe(model);
+    }
+    expect(modelFromLocalName(simulator.open('unknown', {}).name)).toBe('unknown');
   });
 });

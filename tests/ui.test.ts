@@ -6,7 +6,7 @@ import { App } from '../src/app/app';
 import { KNOWN_MODELS } from '../src/protocol/model';
 import { STORAGE_KEY } from '../src/storage/devices';
 import type { BluetoothGateway, BluetoothSupport } from '../src/transport/link';
-import { SimulatedDevice, openSimulatedLink } from '../src/transport/simulator';
+import { SimulatedDevice, createSimulator, openSimulatedLink } from '../src/transport/simulator';
 import { type Scene, createDotScreen, createStage, sample } from '../src/ui/dots';
 import { formatTime, sessionLog, wireText } from '../src/ui/log';
 import {
@@ -57,7 +57,10 @@ function fakeGateway(support: BluetoothSupport): BluetoothGateway {
   };
 }
 
-function open(options: { support?: BluetoothSupport | null; stored?: unknown } = {}): Page {
+/** `simulator: false` mounts the page the way a production build does. */
+function open(
+  options: { support?: BluetoothSupport | null; stored?: unknown; simulator?: boolean } = {},
+): Page {
   document.body.innerHTML = BODY;
   const storage = new Map<string, string>();
   if (options.stored !== undefined) storage.set(STORAGE_KEY, JSON.stringify(options.stored));
@@ -67,7 +70,7 @@ function open(options: { support?: BluetoothSupport | null; stored?: unknown } =
     storage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => void storage.set(key, value) },
     bluetooth: support === null ? null : fakeGateway(support),
     version: '1.2.3',
-    simulatorLatencyMs: 0,
+    simulator: options.simulator === false ? null : createSimulator({ latencyMs: 0 }),
   });
   mount(app);
 
@@ -155,6 +158,57 @@ describe('intro', () => {
   it('explains an insecure page', () => {
     const page = open({ support: 'insecure' });
     expect(page.text('support-notice')).toMatch(/HTTPS or from localhost/);
+  });
+
+  it('has no way into the simulator when the build ships without one', () => {
+    open({ simulator: false });
+    const buttons = [...document.querySelectorAll('button')].map((button) => button.textContent?.trim());
+    expect(buttons).toContain('Connect a device');
+    expect(buttons).not.toContain('Try a simulated device');
+    expect(document.getElementById('demo-button')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/simulat/i);
+  });
+
+  it('shows the supported models as pictures, not buttons, without the simulator', () => {
+    open({ simulator: false });
+    const tiles = [...document.querySelectorAll<HTMLElement>('.model-tile')];
+    expect(tiles.map((tile) => tile.textContent)).toEqual([
+      'ILUMA i',
+      'ILUMA i ONE',
+      'ILUMA i PRIME',
+      'ILUMA',
+      'ILUMA ONE',
+      'ILUMA PRIME',
+    ]);
+    expect(tiles.every((tile) => tile.querySelector('canvas') !== null)).toBe(true);
+    expect(tiles.some((tile) => tile instanceof HTMLButtonElement)).toBe(false);
+    expect(tiles.some((tile) => tile.hasAttribute('title'))).toBe(false);
+    expect(document.querySelector('#model-tiles button')).toBeNull();
+  });
+
+  it('explains a missing or insecure Web Bluetooth without mentioning the simulator', () => {
+    const page = open({ support: null, simulator: false });
+    expect(page.text('support-notice')).toBe(
+      'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android.',
+    );
+    const insecure = open({ support: 'insecure', simulator: false });
+    expect(insecure.text('support-notice')).toBe(
+      'Bluetooth only works on a secure page. Open Sphere over HTTPS or from localhost.',
+    );
+  });
+
+  it('offers the simulator beside Connect, with a line about it over the models', () => {
+    const page = open();
+    expect(page.button('Try a simulated device').id).toBe('demo-button');
+    expect(page.button('Try a simulated device').parentElement).toBe(
+      page.button('Connect a device').parentElement,
+    );
+    expect(document.querySelector('.card-lead')?.textContent).toBe(
+      'No device at hand? Pick a model to try it simulated.',
+    );
+    expect(page.text('support-notice')).toBe('');
+    const unsupported = open({ support: null });
+    expect(unsupported.text('support-notice')).toMatch(/The simulated device still works here\.$/);
   });
 
   it('offers every supported model as a simulated device, each with its own picture', async () => {

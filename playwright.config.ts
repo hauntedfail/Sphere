@@ -1,16 +1,33 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+const HOST = '127.0.0.1';
+const RELEASE_PORT = 4173;
+const DEBUG_PORT = 4174;
 
 /**
- * End-to-end tests run against the production build, so they exercise the
- * real Content-Security-Policy. They use the simulated device: no Bluetooth
- * hardware is involved.
+ * End-to-end tests run against built sites, so they exercise the real
+ * Content-Security-Policy. No Bluetooth hardware is involved.
+ *
+ * Two builds are served. `release` is the production build, which has no
+ * simulator: it is checked for what needs no device, and for the simulator's
+ * absence. `debug` is `pnpm build:debug`, which carries the simulated device
+ * that the device flows run against.
  *
  * `PW_CHANNEL=chrome` uses the installed Google Chrome instead of
  * Playwright's own Chromium download.
  */
 const channel = process.env['PW_CHANNEL'];
+// Each run builds and serves its own copies. A server left on one of these
+// ports is an error, not a shortcut: it could be serving an older build.
+const reuseExistingServer = false;
+
+const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } };
+const phone = { ...devices['Pixel 7'] };
+const release = { baseURL: `http://${HOST}:${RELEASE_PORT}` };
+const debug = { baseURL: `http://${HOST}:${DEBUG_PORT}` };
+
+const preview = (port: number, mode: string): string =>
+  `pnpm exec vite preview --mode ${mode} --port ${port} --strictPort --host ${HOST}`;
 
 export default defineConfig({
   testDir: 'e2e',
@@ -20,18 +37,27 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',
     ...(channel === undefined ? {} : { channel }),
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
-    { name: 'phone', use: { ...devices['Pixel 7'] } },
+    { name: 'desktop', testMatch: 'release.spec.ts', use: { ...desktop, ...release } },
+    { name: 'phone', testMatch: 'release.spec.ts', use: { ...phone, ...release } },
+    { name: 'desktop-debug', testMatch: ['debug.spec.ts', 'shots.spec.ts'], use: { ...desktop, ...debug } },
+    { name: 'phone-debug', testMatch: ['debug.spec.ts', 'shots.spec.ts'], use: { ...phone, ...debug } },
   ],
-  webServer: {
-    command: `pnpm build && pnpm exec vite preview --port ${PORT} --strictPort --host 127.0.0.1`,
-    url: `http://127.0.0.1:${PORT}`,
-    reuseExistingServer: process.env['CI'] === undefined,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: `pnpm build && ${preview(RELEASE_PORT, 'production')}`,
+      url: release.baseURL,
+      reuseExistingServer,
+      timeout: 60_000,
+    },
+    {
+      command: `pnpm build:debug && ${preview(DEBUG_PORT, 'debug')}`,
+      url: debug.baseURL,
+      reuseExistingServer,
+      timeout: 60_000,
+    },
+  ],
 });
