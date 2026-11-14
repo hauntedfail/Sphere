@@ -1,0 +1,16 @@
+// Cloudflare Workers, static assets only: `pnpm build`, then `wrangler deploy`
+// uploads dist/. No Worker script runs in front of the files, and
+// public/_headers (copied into dist/) sets the response headers.
+{
+  "name": "sphere",
+  "compatibility_date": "2026-11-14",
+  "assets": {
+    // The production build. Never dist-debug/: that one carries the simulator.
+    "directory": "./dist"
+  },
+  "routes": [{ "pattern": "sphere.h1ka.ru", "custom_domain": true }],
+  // One origin only. Saved devices and Bluetooth permissions belong to an
+  // origin, so a workers.dev or preview address would be a separate copy.
+  "workers_dev": false,
+  "preview_urls": false
+}

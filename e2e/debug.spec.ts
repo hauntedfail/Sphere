@@ -5,6 +5,7 @@ import {
   expect,
   expectNoSidewaysScroll,
   expectSecurityPolicy,
+  servedCode,
   test,
   toasts,
 } from './support';
@@ -32,6 +33,13 @@ test('carries the simulator under the same security policy', async ({ page }) =>
   const code = bundleCode('dist-debug');
   for (const marker of SIMULATOR_MARKERS) {
     expect(code.includes(marker), `"${marker}" in the debug bundle`).toBe(true);
+  }
+
+  // A deployed site is checked through its served scripts instead. That has
+  // to reach a chunk nothing has loaded yet, which is where the simulator is.
+  const served = await servedCode(page);
+  for (const marker of SIMULATOR_MARKERS) {
+    expect(served.includes(marker), `"${marker}" in the served debug scripts`).toBe(true);
   }
 });
 

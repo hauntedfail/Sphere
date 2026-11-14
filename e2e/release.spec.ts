@@ -4,13 +4,16 @@ import {
   expect,
   expectNoSidewaysScroll,
   expectSecurityPolicy,
+  live,
+  servedCode,
   test,
   toasts,
 } from './support';
 
 /**
  * The production build: what `pnpm build` writes and a host serves. It has
- * no simulator, so these tests cover everything that needs no device.
+ * no simulator, so these tests cover everything that needs no device. With
+ * `SPHERE_URL` set they run against that host instead of a local preview.
  */
 
 test('loads under its security policy without leaving its origin', async ({ page, baseURL }) => {
@@ -70,7 +73,7 @@ test('ships without the simulator', async ({ page }) => {
   await expect(page.locator('body')).not.toContainText(/simulat/i);
 
   // And nothing behind it: the simulated device's own code is not in the bundle.
-  const code = bundleCode('dist');
+  const code = live === null ? bundleCode('dist') : await servedCode(page);
   expect(code.length).toBeGreaterThan(10_000);
   for (const marker of SIMULATOR_MARKERS) {
     expect(code.includes(marker), `"${marker}" in the production bundle`).toBe(false);

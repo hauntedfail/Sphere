@@ -31,7 +31,8 @@ in-memory IQOS. See [Debug builds](#debug-builds).
 
 To publish, run `pnpm build` and upload `dist/` to any static host that serves
 HTTPS. Web Bluetooth only works on a secure origin. The published site has no
-simulator.
+simulator. See [Deploying](#deploying) for the host this repository is set up
+for.
 
 ## Debug builds
 
@@ -154,8 +155,49 @@ connect buttons and the model tiles run):
 
 `public/_headers` carries the header-only parts of the policy
 (`frame-ancestors`, `Permissions-Policy`, HSTS and friends) for hosts that
-read that file, such as Cloudflare Pages and Netlify. On other hosts, set the
-same headers in the server configuration.
+read that file, such as Cloudflare Workers, Cloudflare Pages and Netlify. On
+other hosts, set the same headers in the server configuration.
+
+## Deploying
+
+The site is served from `sphere.h1ka.ru` by Cloudflare Workers as static
+assets: files only, with no Worker script in front of them. `wrangler.jsonc`
+says what is uploaded (`dist/`) and where it is served (that one domain, with
+the `workers.dev` and preview addresses switched off, so the site has a single
+origin).
+
+Cloudflare builds and deploys each push to `main` (Workers Builds, connected
+to this repository):
+
+| Setting | Value |
+|---|---|
+| Build command | `pnpm build` |
+| Deploy command | `npx wrangler deploy` |
+
+Builds for other branches stay off: a branch whose deploy command is
+`wrangler deploy` would replace the live site. `.node-version` and the
+`packageManager` field pin Node.js and pnpm for the build. To deploy by hand
+instead: `pnpm build && pnpm dlx wrangler deploy`.
+
+The zone needs **Always Use HTTPS** switched on, so that an `http://` link
+lands on the secure origin instead of a page that cannot use Bluetooth.
+
+The security policy allows scripts from the site's own origin only and no
+network connections at all, so anything Cloudflare adds to the page either
+breaks or breaks the promise that nothing leaves the browser. Keep these off
+for this hostname: Web Analytics (automatic setup), Rocket Loader, Email
+Address Obfuscation, and Bot Fight Mode's JavaScript detections.
+
+After a deployment, check the real thing:
+
+```bash
+SPHERE_URL=https://sphere.h1ka.ru pnpm e2e
+```
+
+This runs the production-build tests against the deployed site, plus checks
+that only a real host can answer: every header in `public/_headers` arrives
+with the page and with its files, the host has added no script of its own,
+and plain HTTP is sent on to HTTPS.
 
 ## How it is built
 
@@ -201,6 +243,8 @@ pnpm check       # all of the above
 
 `pnpm e2e` uses Playwright's Chromium (`pnpm exec playwright install chromium`
 once). To use an installed Google Chrome instead: `PW_CHANNEL=chrome pnpm e2e`.
+With `SPHERE_URL` set it tests a deployed site instead of building one: see
+[Deploying](#deploying).
 
 What the tests establish:
 

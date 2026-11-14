@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { liveTarget } from './e2e/target';
 
 const HOST = '127.0.0.1';
 const RELEASE_PORT = 4173;
@@ -13,10 +14,16 @@ const DEBUG_PORT = 4174;
  * absence. `debug` is `pnpm build:debug`, which carries the simulated device
  * that the device flows run against.
  *
+ * `SPHERE_URL=https://…` points the tests at a site that is already being
+ * served instead: nothing is built, the production-build tests run against
+ * that address, and `live.spec.ts` checks what only a real host can show,
+ * its response headers.
+ *
  * `PW_CHANNEL=chrome` uses the installed Google Chrome instead of
  * Playwright's own Chromium download.
  */
 const channel = process.env['PW_CHANNEL'];
+const live = liveTarget(process.env['SPHERE_URL']);
 // Each run builds and serves its own copies. A server left on one of these
 // ports is an error, not a shortcut: it could be serving an older build.
 const reuseExistingServer = false;
@@ -29,6 +36,34 @@ const debug = { baseURL: `http://${HOST}:${DEBUG_PORT}` };
 const preview = (port: number, mode: string): string =>
   `pnpm exec vite preview --mode ${mode} --port ${port} --strictPort --host ${HOST}`;
 
+const localProjects = [
+  { name: 'desktop', testMatch: 'release.spec.ts', use: { ...desktop, ...release } },
+  { name: 'phone', testMatch: 'release.spec.ts', use: { ...phone, ...release } },
+  { name: 'desktop-debug', testMatch: ['debug.spec.ts', 'shots.spec.ts'], use: { ...desktop, ...debug } },
+  { name: 'phone-debug', testMatch: ['debug.spec.ts', 'shots.spec.ts'], use: { ...phone, ...debug } },
+];
+
+const localServers = [
+  {
+    command: `pnpm build && ${preview(RELEASE_PORT, 'production')}`,
+    url: release.baseURL,
+    reuseExistingServer,
+    timeout: 60_000,
+  },
+  {
+    command: `pnpm build:debug && ${preview(DEBUG_PORT, 'debug')}`,
+    url: debug.baseURL,
+    reuseExistingServer,
+    timeout: 60_000,
+  },
+];
+
+const LIVE_SPECS = ['release.spec.ts', 'live.spec.ts'];
+const liveProjects = (baseURL: string) => [
+  { name: 'desktop-live', testMatch: LIVE_SPECS, use: { ...desktop, baseURL } },
+  { name: 'phone-live', testMatch: LIVE_SPECS, use: { ...phone, baseURL } },
+];
+
 export default defineConfig({
   testDir: 'e2e',
   outputDir: 'e2e/.results',
@@ -40,24 +75,6 @@ export default defineConfig({
     trace: 'retain-on-failure',
     ...(channel === undefined ? {} : { channel }),
   },
-  projects: [
-    { name: 'desktop', testMatch: 'release.spec.ts', use: { ...desktop, ...release } },
-    { name: 'phone', testMatch: 'release.spec.ts', use: { ...phone, ...release } },
-    { name: 'desktop-debug', testMatch: ['debug.spec.ts', 'shots.spec.ts'], use: { ...desktop, ...debug } },
-    { name: 'phone-debug', testMatch: ['debug.spec.ts', 'shots.spec.ts'], use: { ...phone, ...debug } },
-  ],
-  webServer: [
-    {
-      command: `pnpm build && ${preview(RELEASE_PORT, 'production')}`,
-      url: release.baseURL,
-      reuseExistingServer,
-      timeout: 60_000,
-    },
-    {
-      command: `pnpm build:debug && ${preview(DEBUG_PORT, 'debug')}`,
-      url: debug.baseURL,
-      reuseExistingServer,
-      timeout: 60_000,
-    },
-  ],
+  projects: live === null ? localProjects : liveProjects(live.baseURL),
+  ...(live === null ? { webServer: localServers } : {}),
 });
