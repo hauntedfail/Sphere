@@ -461,7 +461,11 @@ describe('workspace', () => {
   });
 
   it('keeps the details list as the user left it', async () => {
-    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('min-width') }));
+    // A wide window, still asking for reduced motion: a page that animates
+    // would leave its timer running after this file's document is gone.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('min-width') || query.includes('reduced-motion'),
+    }));
     const page = await connectedPage();
     const details = (): HTMLDetailsElement => document.querySelector('.device-details') as HTMLDetailsElement;
     // On a wide window there is room, so the list starts unfolded.
