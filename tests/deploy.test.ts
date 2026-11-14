@@ -80,7 +80,19 @@ describe('response headers', () => {
   });
 
   it('keeps the page itself revalidated, so a new build is picked up', () => {
-    const everything = rules.slice(rules.indexOf('/*\n'), rules.indexOf('/assets/*'));
-    expect(everything).not.toMatch(/Cache-Control/);
+    expect(rules).toMatch(/^\/\n {2}Cache-Control: public, max-age=0, must-revalidate, no-transform$/m);
+  });
+
+  it('tells the host not to rewrite the page on its way out', () => {
+    // Cloudflare's bot detection adds an inline script to HTML it proxies.
+    // The security policy refuses to run it, which shows as a console error
+    // on every visit. A response marked no-transform is left as it was built.
+    // Comments aside: only the lines that set a header.
+    const headers = (block: string): string[] => block.split('\n').filter((line) => line.startsWith('  '));
+    const split = rules.indexOf('\n/\n');
+    expect(split).toBeGreaterThan(0);
+    expect(headers(rules.slice(split)).join('\n')).toMatch(/no-transform/);
+    // Only the page: compressing scripts and styles is a transformation too.
+    expect(headers(rules.slice(0, split)).join('\n')).not.toMatch(/no-transform/);
   });
 });

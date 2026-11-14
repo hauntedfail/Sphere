@@ -9,6 +9,7 @@ import { expect, headerRules, live, scriptUrls, test } from './support';
 const rules = headerRules();
 const everywhere = rules.get('/*') ?? [];
 const fingerprinted = rules.get('/assets/*') ?? [];
+const pageOnly = rules.get('/') ?? [];
 
 test('the page arrives with the headers public/_headers asks for', async ({ page }) => {
   const response = await page.goto('/');
@@ -16,8 +17,9 @@ test('the page arrives with the headers public/_headers asks for', async ({ page
 
   expect(everywhere.length).toBeGreaterThan(5);
   for (const [name, value] of everywhere) expect(sent[name.toLowerCase()], name).toBe(value);
-  // The page is asked for again on every visit, so a new build is picked up.
-  expect(sent['cache-control'] ?? '').toMatch(/max-age=0|no-cache/);
+  // The page is asked for again on every visit, and is not to be rewritten.
+  expect(pageOnly.length).toBeGreaterThan(0);
+  for (const [name, value] of pageOnly) expect(sent[name.toLowerCase()], name).toBe(value);
 });
 
 test('so does every other file, and the fingerprinted ones may be kept', async ({ page }) => {

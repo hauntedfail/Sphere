@@ -179,14 +179,24 @@ Builds for other branches stay off: a branch whose deploy command is
 `packageManager` field pin Node.js and pnpm for the build. To deploy by hand
 instead: `pnpm build && pnpm dlx wrangler deploy`.
 
-The zone needs **Always Use HTTPS** switched on, so that an `http://` link
-lands on the secure origin instead of a page that cannot use Bluetooth.
-
 The security policy allows scripts from the site's own origin only and no
 network connections at all, so anything Cloudflare adds to the page either
-breaks or breaks the promise that nothing leaves the browser. Keep these off
-for this hostname: Web Analytics (automatic setup), Rocket Loader, Email
-Address Obfuscation, and Bot Fight Mode's JavaScript detections.
+breaks or breaks the promise that nothing leaves the browser. Two things keep
+the page as it was built:
+
+- `public/_headers` sends the page with `Cache-Control: no-transform`.
+  Cloudflare leaves such a response alone. Without it, Bot Fight Mode's
+  JavaScript detections add an inline script to the page, which the policy
+  refuses to run and the console reports on every visit. Bot Fight Mode is a
+  setting of the whole zone and cannot be switched off for one hostname, so
+  the header is what keeps it away from this site. The cost is that
+  Cloudflare does not compress the page either (7 kB instead of 2 kB);
+  scripts, styles and fonts are unaffected.
+- Web Analytics (automatic setup), Rocket Loader and Email Address
+  Obfuscation stay off or have nothing to act on.
+
+The zone has **Always Use HTTPS** switched on, so that an `http://` link
+lands on the secure origin instead of a page that cannot use Bluetooth.
 
 After a deployment, check the real thing:
 
