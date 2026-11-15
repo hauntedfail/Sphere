@@ -1,0 +1,57 @@
+name: Release
+
+# Pushing a tag such as v0.2.0 publishes a GitHub Release for it, once the
+# tag is shown to name the version in package.json and every check passes.
+# The site itself is deployed by Cloudflare from main, not from here.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Tag matches package.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The page shows the version from package.json. A tag that names
+      # another version would describe a site that was never built.
+      - name: Compare the tag with package.json
+        run: |
+          version="v$(jq -r .version package.json)"
+          if [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+  check:
+    name: Checks
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Publish GitHub Release
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create the release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes

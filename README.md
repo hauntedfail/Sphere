@@ -183,6 +183,10 @@ Builds for other branches stay off: a branch whose deploy command is
 `packageManager` field pin Node.js and pnpm for the build. To deploy by hand
 instead: `pnpm build && pnpm dlx wrangler deploy`.
 
+Cloudflare does not wait for the tests. Its build stops on a type error, but
+a push whose tests fail on GitHub (see [Verification](#verification)) is
+deployed all the same.
+
 The security policy allows scripts from the site's own origin only and no
 network connections at all, so anything Cloudflare adds to the page either
 breaks or breaks the promise that nothing leaves the browser. Two things keep
@@ -218,6 +222,22 @@ This runs the production-build tests against the deployed site, plus checks
 that only a real host can answer: every header in `public/_headers` arrives
 with the page and with its files, the host has added no script of its own,
 and plain HTTP is sent on to HTTPS.
+
+## Releasing
+
+The version the page shows is the `version` field of `package.json`, read
+when the site is built. It changes only when that field does:
+
+```bash
+npm version patch -m "chore: release v%s"   # or minor, or major
+git push --follow-tags
+```
+
+`npm version` edits `package.json`, commits it and tags the commit `v0.1.1`.
+The push to `main` makes Cloudflare deploy a site that shows the new version.
+The tag starts `.github/workflows/release.yml`, which checks that the tag
+names the version in `package.json`, runs `pnpm check`, and then publishes a
+GitHub Release with notes generated from the commits since the last one.
 
 ## How it is built
 
@@ -265,6 +285,9 @@ pnpm check       # all of the above
 once). To use an installed Google Chrome instead: `PW_CHANNEL=chrome pnpm e2e`.
 With `SPHERE_URL` set it tests a deployed site instead of building one: see
 [Deploying](#deploying).
+
+GitHub Actions runs `pnpm check` on every push to `main` and on every pull
+request (`.github/workflows/ci.yml`).
 
 What the tests establish:
 
