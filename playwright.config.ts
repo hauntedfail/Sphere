@@ -21,7 +21,12 @@ const DEBUG_PORT = 4174;
  *
  * `PW_CHANNEL=chrome` uses the installed Google Chrome instead of
  * Playwright's own Chromium download.
+ *
+ * Chromium on Linux ships with Web Bluetooth switched off, and a page without
+ * it has no "Connect a device" button to test. The browser is started with
+ * the feature on, which changes nothing where it is on already.
  */
+const WEB_BLUETOOTH = '--enable-features=WebBluetooth';
 const channel = process.env['PW_CHANNEL'];
 const live = liveTarget(process.env['SPHERE_URL']);
 // Each run builds and serves its own copies. A server left on one of these
@@ -73,6 +78,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     trace: 'retain-on-failure',
+    launchOptions: { args: [WEB_BLUETOOTH] },
     ...(channel === undefined ? {} : { channel }),
   },
   projects: live === null ? localProjects : liveProjects(live.baseURL),
