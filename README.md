@@ -194,10 +194,16 @@ the page as it was built:
   refuses to run and the console reports on every visit. Bot Fight Mode is a
   setting of the whole zone and cannot be switched off for one hostname, so
   the header is what keeps it away from this site. The cost is that
-  Cloudflare does not compress the page either (7 kB instead of 2 kB);
+  Cloudflare does not compress the page either (8 kB instead of 2 kB);
   scripts, styles and fonts are unaffected.
 - Web Analytics (automatic setup), Rocket Loader and Email Address
   Obfuscation stay off or have nothing to act on.
+
+`index.html` carries Open Graph tags for sites that show a link as a card.
+They name the page and its picture (`public/social-preview.png`) by their full
+addresses on `sphere.h1ka.ru`, because the site showing the card fetches them
+from outside. A test holds those addresses to the domain in `wrangler.jsonc`,
+so serving the site somewhere else means changing both.
 
 The zone has **Always Use HTTPS** switched on, so that an `http://` link
 lands on the secure origin instead of a page that cannot use Bluetooth.

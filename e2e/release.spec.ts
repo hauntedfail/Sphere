@@ -121,3 +121,13 @@ test('says so when the browser has no Web Bluetooth', async ({ page }) => {
   await expect(page.locator('#support-notice')).not.toContainText(/simulat/i);
   await expect(page.getByRole('button', { name: 'Connect a device' })).toBeHidden();
 });
+
+test('serves the picture that link previews show', async ({ page }) => {
+  await page.goto('/');
+  const address = await page.locator('meta[property="og:image"]').getAttribute('content');
+  // The page names it by its public address. Ask this site for the same path.
+  expect(address).toMatch(/^https:\/\//);
+  const response = await page.request.get(new URL(address ?? '').pathname);
+  expect(response.ok()).toBe(true);
+  expect(response.headers()['content-type']).toBe('image/png');
+});

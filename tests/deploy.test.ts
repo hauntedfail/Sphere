@@ -96,3 +96,48 @@ describe('response headers', () => {
     expect(headers(rules.slice(0, split)).join('\n')).not.toMatch(/no-transform/);
   });
 });
+
+describe('link previews', () => {
+  // A site that shows a link to this one reads these from the page's <head>.
+  // It fetches them from outside, so every address must be a full one.
+  const PICTURE = 'public/social-preview.png';
+  const page = read('index.html');
+  const origin = `https://${wrangler().routes?.[0]?.pattern ?? ''}`;
+
+  /** `content` of every <meta> in the page, by its `property` or `name`. */
+  const meta = new Map<string, string>();
+  for (const [tag] of page.matchAll(/<meta\b[^>]*>/g)) {
+    const attribute = (name: string): string | undefined => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+    const key = attribute('property') ?? attribute('name');
+    const content = attribute('content');
+    if (key !== undefined && content !== undefined) meta.set(key, content);
+  }
+
+  it('point at the one address the site is served from', () => {
+    expect(meta.get('og:url')).toBe(`${origin}/`);
+    expect(meta.get('og:image')).toBe(`${origin}/${PICTURE.replace('public/', '')}`);
+  });
+
+  it('show a picture that ships with the site, at the size the page states', () => {
+    const png = readFileSync(new URL(`../${PICTURE}`, import.meta.url));
+    expect(png.subarray(0, 8).toString('latin1')).toBe('\x89PNG\r\n\x1a\n');
+    expect(meta.get('og:image:type')).toBe('image/png');
+    expect(meta.get('og:image:width')).toBe(String(png.readUInt32BE(16)));
+    expect(meta.get('og:image:height')).toBe(String(png.readUInt32BE(20)));
+    // Wide enough for a large card, and well under the 5 MB some sites stop at.
+    expect(png.readUInt32BE(16)).toBeGreaterThanOrEqual(1200);
+    expect(png.length).toBeLessThan(1_000_000);
+    expect(meta.get('og:image:alt') ?? '').not.toBe('');
+  });
+
+  it('ask for the large card', () => {
+    expect(meta.get('twitter:card')).toBe('summary_large_image');
+  });
+
+  it('say what the page says about itself', () => {
+    expect(meta.get('og:type')).toBe('website');
+    expect(meta.get('og:title')).toBe(/<title>([^<]*)<\/title>/.exec(page)?.[1]);
+    expect(meta.get('og:description')).toBe(meta.get('description'));
+    expect(meta.get('description') ?? '').not.toBe('');
+  });
+});
