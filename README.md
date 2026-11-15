@@ -1,5 +1,9 @@
 # Sphere
 
+<p align="center">
+  <img src=".github/sphere.gif" width="100%" alt="An engraved lady holds an IQOS ILUMA i whose screen reads 01 and breathes out a plume of binary digits; in close-up she smiles and winks. Then: no app, no account, no server; Web Bluetooth; the six supported models; every setting as a dot picture; the same commands as iqos_cli; one protocol in three bodies (iqos, iqos_cli, Sphere); sphere.h1ka.ru.">
+</p>
+
 Control an IQOS ILUMA from a web page over Bluetooth. Sphere is the browser
 counterpart of [`iqos_cli`](https://github.com/V-VX/iqos_cli): the same
 operations, as a settings app. Each setting comes with a picture, a short
