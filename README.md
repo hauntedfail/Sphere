@@ -25,9 +25,10 @@ pnpm install
 pnpm dev        # http://localhost:5173
 ```
 
-Open the page in Chrome, Edge or Opera (desktop or Android). Wake the device,
-close the IQOS app, press **Connect a device** and pick it from the browser's
-list. The first connection asks the operating system to pair.
+Open the page in Chrome, Edge or Opera (desktop or Android), or in Bluefy on
+an iPhone or iPad. Wake the device, close the IQOS app, press **Connect a
+device** and pick it from the browser's list. The first connection asks the
+operating system to pair.
 
 No device at hand, or a browser without Web Bluetooth? The dev server carries
 a simulated device: **Try a simulated device** runs everything against an
@@ -324,7 +325,12 @@ market.
 | Browser | Works |
 |---|---|
 | Chrome, Edge, Opera on Windows, macOS, Linux, ChromeOS, Android | yes |
-| Firefox, Safari, every browser on iOS | no Web Bluetooth; only a debug build's simulator runs |
+| [Bluefy](https://apps.apple.com/app/id1492822055) on iOS and iPadOS | expected to; not tested with Sphere |
+| Firefox, Safari, the other browsers on iOS and iPadOS | no Web Bluetooth; only a debug build's simulator runs |
+
+Safari has no Web Bluetooth, and nearly every browser on iOS and iPadOS runs
+on Safari's engine. Bluefy is a browser that adds Web Bluetooth itself.
+IQOS's own support sends iPhone users to it for the IQOS web app.
 
 On Linux, Chrome needs BlueZ 5.41 or later.
 

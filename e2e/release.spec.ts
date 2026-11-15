@@ -118,6 +118,7 @@ test('says so when the browser has no Web Bluetooth', async ({ page }) => {
   });
   await page.goto('/');
   await expect(page.locator('#support-notice')).toContainText('no Web Bluetooth');
+  await expect(page.locator('#support-notice')).toContainText('On an iPhone or iPad, use Bluefy.');
   await expect(page.locator('#support-notice')).not.toContainText(/simulat/i);
   await expect(page.getByRole('button', { name: 'Connect a device' })).toBeHidden();
 });

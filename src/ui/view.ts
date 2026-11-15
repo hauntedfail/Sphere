@@ -20,7 +20,7 @@ import { GLOBE_SIZE, globeScene } from './scenes';
 const SUPPORT_NOTICE: Record<AppState['support'], string> = {
   ok: '',
   unsupported:
-    'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android.',
+    'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android. On an iPhone or iPad, use Bluefy.',
   insecure: 'Bluetooth only works on a secure page. Open Sphere over HTTPS or from localhost.',
 };
 /** Added to a support notice in builds that carry the simulator. */

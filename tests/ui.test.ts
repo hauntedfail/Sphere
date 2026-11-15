@@ -189,7 +189,7 @@ describe('intro', () => {
   it('explains a missing or insecure Web Bluetooth without mentioning the simulator', () => {
     const page = open({ support: null, simulator: false });
     expect(page.text('support-notice')).toBe(
-      'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android.',
+      'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android. On an iPhone or iPad, use Bluefy.',
     );
     const insecure = open({ support: 'insecure', simulator: false });
     expect(insecure.text('support-notice')).toBe(

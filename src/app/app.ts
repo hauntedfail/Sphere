@@ -183,7 +183,7 @@ export class App {
       throw transportError(
         support === 'insecure'
           ? 'Bluetooth needs a secure page. Open Sphere over HTTPS or from localhost.'
-          : 'this browser has no Web Bluetooth. Use Chrome, Edge or Opera on desktop or Android.',
+          : 'this browser has no Web Bluetooth. Use Chrome, Edge or Opera on desktop or Android, or Bluefy on an iPhone or iPad.',
       );
     }
 

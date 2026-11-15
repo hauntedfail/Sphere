@@ -173,6 +173,7 @@ describe('connecting', () => {
     const none = harness(null);
     expect(none.state().support).toBe('unsupported');
     expect((await none.run('connect'))[0]).toMatch(/no Web Bluetooth/);
+    expect((await none.run('connect'))[0]).toMatch(/Bluefy on an iPhone or iPad/);
 
     const bluetooth = new FakeBluetooth();
     bluetooth.supportLevel = 'insecure';
