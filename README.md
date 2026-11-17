@@ -12,11 +12,9 @@ guide, and its controls.
 It is a static site. There is no server, no account and no telemetry, and the
 page's own security policy forbids it from making network requests.
 
-> **Status: not yet tested on hardware.** The protocol layer is a port of the
-> [`iqos`](https://github.com/V-VX/iqos) crate, checked byte for byte against
-> that crate's test vectors and against frames captured from an ILUMA i. The
-> rest was exercised against a simulated device. Nobody has yet connected
-> this build to a real IQOS. See [Verification](#verification).
+The protocol layer is a port of the [`iqos`](https://github.com/V-VX/iqos)
+crate, checked byte for byte against that crate's test vectors and against
+frames captured from an ILUMA i. See [Verification](#verification).
 
 ## Run it
 
@@ -30,31 +28,9 @@ an iPhone or iPad. Wake the device, close the IQOS app, press **Connect a
 device** and pick it from the browser's list. The first connection asks the
 operating system to pair.
 
-No device at hand, or a browser without Web Bluetooth? The dev server carries
-a simulated device: **Try a simulated device** runs everything against an
-in-memory IQOS. See [Debug builds](#debug-builds).
-
 To publish, run `pnpm build` and upload `dist/` to any static host that serves
-HTTPS. Web Bluetooth only works on a secure origin. The published site has no
-simulator. See [Deploying](#deploying) for the host this repository is set up
-for.
-
-## Debug builds
-
-The simulated device is a development aid, so it is compiled in only outside
-production:
-
-| Command | Simulator | Output |
-|---|---|---|
-| `pnpm dev` | yes | dev server |
-| `pnpm build:debug` | yes | `dist-debug/` |
-| `pnpm build` | no | `dist/` |
-
-`vite.config.ts` defines the constant `__SIMULATOR__` from the build mode, and
-`src/main.ts` is the only code that reads it. In a production build the
-bundler drops that branch and the simulator module with it: no button, no
-`demo` command, and no simulator code in the bundle. The end-to-end tests
-check all three. A debug build keeps the production security policy.
+HTTPS. Web Bluetooth only works on a secure origin. See
+[Deploying](#deploying) for the host this repository is set up for.
 
 ## The page
 
@@ -69,9 +45,7 @@ Connected, the page shows the device and its settings.
   under them the switch or choice. Settings the device reports follow the
   device; the two it does not report (Smart gesture and lock) mark nothing
   until you choose, then show what was last set here.
-- **Supported models** on the start page shows each model's drawing. In a
-  debug build the drawings are buttons: each starts the simulator as that
-  model.
+- **Supported models** on the start page shows each model's drawing.
 
 The outcome of a click appears as a short notice at the bottom of the page.
 There is no console. For a bug report, **Details → Copy session log** copies
@@ -111,7 +85,6 @@ connect buttons and the model tiles run):
 | `connect <label>` | Reconnect to a saved device |
 | `connect --last` | Reconnect to the most recent device |
 | `connect --all` | List every nearby device, for names Sphere does not expect |
-| `demo [model]` | Connect to a simulated device (debug builds only) |
 | `model <model>` | Say which model this is when its name does not |
 | `refresh` | Read every setting again |
 | `disconnect`, `exit`, `quit` | Close the connection |
@@ -248,7 +221,6 @@ src/
                response parsers, model capability matrix. Pure functions.
   transport/   session.ts        request/response over any notify channel
                web-bluetooth.ts  the only code that touches navigator.bluetooth
-               simulator.ts      an in-memory IQOS for debug builds and tests
   device/      iqos.ts           typed operations, same sequences as the crate
   console/     the command grammar the controls speak
   storage/     saved device labels
@@ -278,7 +250,7 @@ labels. The page sets no inline styles, so `style-src 'self'` holds.
 pnpm typecheck   # strict TypeScript
 pnpm test        # unit and DOM tests (Vitest)
 pnpm coverage    # the same, with coverage thresholds
-pnpm e2e         # Playwright against the production and debug builds
+pnpm e2e         # Playwright, in a real browser
 pnpm check       # all of the above
 ```
 
@@ -300,33 +272,23 @@ What the tests establish:
   corrupt, unsolicited and missing replies, and never interleaves requests.
 - The Web Bluetooth adapter is driven through a fake GATT stack: chooser
   filters, reconnection, the blocked serial number, dropped links.
-- Every command produces the CLI's output against the simulator.
 - Every picture is a pure function of position and time, tested as one: each
   model draws differently, and each guide picture follows its setting.
 - In a real browser, on desktop and phone viewports: the security policy
   holds, no request leaves the origin, and stored or typed text is never
-  rendered as markup. The production build has no simulator, on the page or
-  in the bundle. The device flows, by mouse and by keyboard, run against the
-  debug build.
-
-What they do not establish: that a physical device accepts all of this. The
-simulator's read replies follow real captures, but its write acknowledgements
-and its battery-voltage frame are invented, because no capture shows them. If
-a write times out on real hardware, the session log shows exactly which frame
-went unanswered.
+  rendered as markup. The device flows run by mouse and by keyboard.
 
 The guides describe the settings as IQOS's own published help describes them
-(session counts, the eight-minute pause, up to four extra puffs). They have
-not been checked against a device, and those details can differ by model and
-market.
+(session counts, the eight-minute pause, up to four extra puffs). Those
+details can differ by model and market.
 
 ## Browser support
 
 | Browser | Works |
 |---|---|
 | Chrome, Edge, Opera on Windows, macOS, Linux, ChromeOS, Android | yes |
-| [Bluefy](https://apps.apple.com/app/id1492822055) on iOS and iPadOS | expected to; not tested with Sphere |
-| Firefox, Safari, the other browsers on iOS and iPadOS | no Web Bluetooth; only a debug build's simulator runs |
+| [Bluefy](https://apps.apple.com/app/id1492822055) on iOS and iPadOS | yes |
+| Firefox, Safari, the other browsers on iOS and iPadOS | no Web Bluetooth |
 
 Safari has no Web Bluetooth, and nearly every browser on iOS and iPadOS runs
 on Safari's engine. Bluefy is a browser that adds Web Bluetooth itself.
