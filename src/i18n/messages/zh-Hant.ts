@@ -106,11 +106,11 @@ export const zhHant = {
     labelPlaceholder: '標籤',
     rows: {
       productNumber: '產品編號',
-      stickFirmware: '加熱桿韌體',
+      stickFirmware: '主機韌體',
       holder: '加熱桿',
       holderNoAnswer: '無回應',
       holderProduct: '加熱桿產品編號',
-      holderFirmware: '加熱桿韌體版本',
+      holderFirmware: '加熱桿韌體',
       batteryVoltage: '電池電壓',
       modelNumber: '型號編號',
       softwareRev: '軟體修訂',

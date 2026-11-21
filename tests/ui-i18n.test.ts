@@ -178,6 +178,32 @@ describe('the language switch', () => {
     expect(document.querySelectorAll('.is-waiting').length).toBe(0);
   });
 
+  it('leaves the notice of a command that is running to that command', async () => {
+    const page = await connectedPage({ loadI18n: loadMirror });
+    page.buttonByKey('lock').click();
+    await choose('ko');
+    await page.settle();
+    expect(page.app.store.get().i18n.locale).toBe('ko');
+    expect(page.text('toasts')).toBe('⟦result.locked⟧');
+  });
+
+  it('is not announced in the notice of a command that says nothing', async () => {
+    const page = await connectedPage({ loadI18n: loadMirror });
+    page.buttonByKey('refresh').click();
+    await choose('ko');
+    await page.settle();
+    expect(page.text('toasts')).toBe('');
+  });
+
+  it('does not show a failed choice of language twice, nor as another command\'s failure', async () => {
+    const page = await connectedPage({ loadI18n: () => Promise.reject(new Error('offline')) });
+    page.buttonByKey('lock').click();
+    await choose('ja');
+    await page.settle();
+    // The command's own answer, last: the failed choice was reported once, when it failed.
+    expect(page.text('toasts')).toBe('Device locked');
+  });
+
   it('follows a language chosen any other way', async () => {
     const page = openPage({ loadI18n: loadMirror });
     await page.run('lang zh-Hant');

@@ -106,11 +106,11 @@ export const zhHans = {
     labelPlaceholder: '标签',
     rows: {
       productNumber: '产品编号',
-      stickFirmware: '加热杆固件',
+      stickFirmware: '主机固件',
       holder: '加热杆',
       holderNoAnswer: '无应答',
       holderProduct: '加热杆产品编号',
-      holderFirmware: '加热杆固件版本',
+      holderFirmware: '加热杆固件',
       batteryVoltage: '电池电压',
       modelNumber: '型号编号',
       softwareRev: '软件修订',

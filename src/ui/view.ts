@@ -2,7 +2,7 @@
 import type { App } from '../app/app';
 import type { AppState, ConsoleLine } from '../app/state';
 import type { Translate } from '../i18n/i18n';
-import { render } from '../i18n/message';
+import { type MessageRef, render } from '../i18n/message';
 import type { MessageKey } from '../i18n/messages/en';
 import { modelLabel } from '../protocol/model';
 import { byId, h, redraw } from './dom';
@@ -47,6 +47,19 @@ const SETTINGS_KEYS = [
 const TOAST_MS = 3600;
 /** Wide enough for the device card and the settings to sit side by side. */
 const WIDE_LAYOUT = '(min-width: 960px)';
+
+/**
+ * Whether a console line is about choosing the page's language. Such a line
+ * is printed beside the command queue, so it can land among the answers to a
+ * command that is still running. It is not one of them.
+ */
+function aboutLanguage(line: ConsoleLine): boolean {
+  const message = line.message;
+  if (message === undefined) return false;
+  if (message.key === 'result.language') return true;
+  const detail = message.params?.['detail'];
+  return typeof detail === 'object' && (detail as MessageRef).key === 'error.languageUnavailable';
+}
 
 function changed(state: AppState, previous: AppState | null, keys: readonly (keyof AppState)[]): boolean {
   return previous === null || keys.some((key) => state[key] !== previous[key]);
@@ -146,7 +159,9 @@ export function mount(app: App): void {
     const from = reportFrom;
     reportFrom = null;
     if (from === null) return;
-    const fresh = lines.filter((line) => line.id > from && line.tone !== 'input' && line.text !== '');
+    const fresh = lines.filter(
+      (line) => line.id > from && line.tone !== 'input' && line.text !== '' && !aboutLanguage(line),
+    );
     const failure = fresh.find((line) => line.tone === 'error');
     const [only] = fresh;
     if (failure !== undefined) toast(said(failure), 'error');
@@ -185,7 +200,7 @@ export function mount(app: App): void {
     await app.run(`lang ${locale}`);
     const state = app.store.get();
     languageSelect.value = state.i18n.locale;
-    const failure = state.console.find((line) => line.id > newest && line.tone === 'error');
+    const failure = state.console.find((line) => line.id > newest && line.tone === 'error' && aboutLanguage(line));
     if (failure !== undefined) toast(said(failure), 'error');
   });
 

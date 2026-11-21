@@ -243,6 +243,13 @@ describe.each(TRANSLATED)('the %s dictionary', (locale) => {
     expect(untouched.sort()).toEqual([...(SAME_AS_ENGLISH[locale] ?? [])].sort());
   });
 
+  it('gives each row of the device card a label of its own', async () => {
+    const { rows } = (await loadMessages(locale)).device;
+    expect(new Set(Object.values(rows)).size).toBe(Object.keys(rows).length);
+    // The first firmware row is the charger's, or the whole device's: it must not be named after the holder.
+    expect(rows.stickFirmware.toLowerCase()).not.toContain(rows.holder.toLowerCase());
+  });
+
   it('is what the page gets when it asks for the language', async () => {
     const loaded = await loadI18n(locale);
     const own = await loadMessages(locale);
