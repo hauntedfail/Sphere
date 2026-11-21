@@ -30,7 +30,8 @@ export const it = {
       title: 'Cosa resta su questa pagina',
       everything:
         'Tutto. La politica di sicurezza della pagina vieta le richieste di rete, quindi nulla può essere inviato altrove.',
-      labels: 'Le etichette dei dispositivi salvati restano nella memoria di questo browser e in nessun altro posto.',
+      labels:
+        'Le etichette dei dispositivi salvati e la lingua scelta restano nella memoria di questo browser e in nessun altro posto.',
       serial: 'Il numero di serie non viene mai letto. I browser lo bloccano, e a Sphere non serve.',
     },
     matrix: {

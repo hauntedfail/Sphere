@@ -27,7 +27,7 @@ export const zhHans = {
     privacy: {
       title: '哪些内容留在此页面',
       everything: '全部。此页面的安全策略禁止网络请求，所以任何内容都无法发送出去。',
-      labels: '已保存的设备标签只存放在此浏览器的存储中。',
+      labels: '已保存的设备标签和你选择的语言只存放在此浏览器的存储中。',
       serial: '从不读取序列号。浏览器会拦截它，Sphere 也不需要它。',
     },
     matrix: {

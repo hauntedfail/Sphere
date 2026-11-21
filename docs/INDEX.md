@@ -26,7 +26,9 @@ Each contract has one owner. The last column is what fails when it is broken.
 | No network, no inline script, no markup from text | `vite.config.ts` (the policy in the page), `public/_headers` (the policy as a header) | `e2e/release.spec.ts`, `tests/boundaries.test.ts` |
 | Simulator in the dev server and the debug build only | `vite.config.ts`, `src/main.ts` | `tests/build.test.ts`, `e2e/release.spec.ts`, `e2e/debug.spec.ts` |
 | Bluetooth from one file; the page from `src/ui/` only | `src/transport/web-bluetooth.ts`, `src/ui/` | `tests/boundaries.test.ts` |
-| No runtime dependencies | `package.json` | `tests/boundaries.test.ts` |
+| One runtime dependency, i18next, which brings none of its own | `package.json` | `tests/boundaries.test.ts` |
+| Every language has every message, and fonts that hold its characters | `src/i18n/messages/`, `tools/fonts/` | `tests/i18n.test.ts`, `tests/fonts.test.ts` |
+| The words in `index.html` are the English dictionary's | `src/i18n/messages/en.ts` | `tests/ui-i18n.test.ts` |
 | Frame layout, checksums, command bytes | `src/protocol/` | `tests/scp.test.ts`, `tests/protocol.test.ts` |
 | Request and reply matching, fragments, timeouts | `src/transport/session.ts` | `tests/session.test.ts` |
 | What is deployed, and to which one origin | `wrangler.jsonc` | `tests/deploy.test.ts` |

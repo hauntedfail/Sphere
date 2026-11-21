@@ -14,6 +14,8 @@ not.
 - `src/transport/`: the session, the Web Bluetooth adapter and the simulator.
 - `src/device/`, `src/console/`, `src/storage/`, `src/app/`: typed operations,
   the command grammar, saved labels, state and the command queue.
+- `src/i18n/`: the languages and their dictionaries. No DOM.
+- `tools/fonts/`: makes the per-language fonts under `src/assets/fonts/`.
 - `src/ui/`: rendering. With `src/main.ts`, the only code that touches the page.
 - `tests/`: Vitest. Unit tests, DOM tests and checks on the repository itself.
 - `e2e/`: Playwright, against the production build and the debug build.
@@ -34,8 +36,10 @@ in `.node-version` and the pnpm version in `package.json`.
 
 - A push to `main` is a deployment. Cloudflare builds and publishes it without
   waiting for the tests. Run `pnpm check` first, and push only when asked.
-- The page makes no network request. Add no request, analytics, remote font,
-  remote script or runtime dependency.
+- The page makes no network request. Add no request, analytics, remote font
+  or remote script, and no runtime dependency beyond `i18next`.
+- A word the page shows goes in every dictionary under `src/i18n/messages/`.
+  If it brings a new character, rebuild the fonts: [docs/fonts.md](docs/fonts.md).
 - Text from a device or from storage reaches the page as text nodes. No markup
   built from strings and no inline styles.
 - The simulator ships in the dev server and `pnpm build:debug` only, and

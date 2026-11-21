@@ -27,7 +27,7 @@ export const en = {
       title: 'What stays on this page',
       everything:
         "Everything. The page's security policy forbids network requests, so nothing can be sent anywhere.",
-      labels: "Saved device labels live in this browser's storage and nowhere else.",
+      labels: "Saved device labels and the language you chose live in this browser's storage and nowhere else.",
       serial: 'The serial number is never read. Browsers block it, and Sphere does not need it.',
     },
     matrix: {

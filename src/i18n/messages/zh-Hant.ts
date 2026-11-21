@@ -27,7 +27,7 @@ export const zhHant = {
     privacy: {
       title: '哪些內容留在此頁面',
       everything: '全部。此頁面的安全政策禁止網路請求，所以任何內容都無法傳送出去。',
-      labels: '已儲存的裝置標籤只存放在此瀏覽器的儲存空間。',
+      labels: '已儲存的裝置標籤和你選擇的語言只存放在此瀏覽器的儲存空間。',
       serial: '從不讀取序號。瀏覽器會攔截它，Sphere 也不需要它。',
     },
     matrix: {
