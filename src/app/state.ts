@@ -1,4 +1,5 @@
 import type { DeviceStatus } from '../device/iqos';
+import type { I18n } from '../i18n/i18n';
 import type { DeviceInfo } from '../protocol/gatt';
 import type { Diagnosis } from '../protocol/identity';
 import type { DeviceModel } from '../protocol/model';
@@ -72,6 +73,8 @@ export interface AppState {
   readonly console: readonly ConsoleLine[];
   readonly wire: readonly WireLine[];
   readonly book: DeviceBook;
+  /** The language the page is drawn in. */
+  readonly i18n: I18n;
 }
 
 /** The slice of state that describes the connected device. */
@@ -104,7 +107,7 @@ export const NO_DEVICE_FIELDS: DeviceFields = {
   finding: false,
 };
 
-export function initialState(support: BluetoothSupport, book: DeviceBook): AppState {
+export function initialState(support: BluetoothSupport, book: DeviceBook, i18n: I18n): AppState {
   return {
     support,
     phase: 'idle',
@@ -114,6 +117,7 @@ export function initialState(support: BluetoothSupport, book: DeviceBook): AppSt
     console: [],
     wire: [],
     book,
+    i18n,
   };
 }
 

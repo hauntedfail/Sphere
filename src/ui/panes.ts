@@ -1,6 +1,7 @@
 /** Device and settings panes: functions from state to DOM nodes. */
-import { serialText } from '../app/format';
 import type { AppState, ConnectedDevice, Field } from '../app/state';
+import type { Translate } from '../i18n/i18n';
+import type { MessageKey, Messages } from '../i18n/messages/en';
 import { formatFirmware } from '../protocol/identity';
 import { KNOWN_MODELS, type Capability, modelLabel, supports } from '../protocol/model';
 import { sortedLabels } from '../storage/devices';
@@ -26,14 +27,14 @@ import {
 /** Run a console line, exactly as if it had been typed at a prompt. */
 export type Run = (line: string) => void;
 
-const FEATURE_NAMES: Partial<Record<Capability, string>> = {
-  brightness: 'brightness',
-  vibration: 'vibration',
-  flexpuff: 'FlexPuff',
-  flexbattery: 'FlexBattery',
-  autostart: 'auto start',
-  smartgesture: 'smart gesture',
-  lock: 'lock',
+const FEATURE_NAMES: Partial<Record<Capability, MessageKey>> = {
+  brightness: 'settings.missing.brightness',
+  vibration: 'settings.missing.vibration',
+  flexpuff: 'settings.missing.flexpuff',
+  flexbattery: 'settings.missing.flexbattery',
+  autostart: 'settings.missing.autostart',
+  smartgesture: 'settings.missing.smartgesture',
+  lock: 'settings.missing.lock',
 };
 
 /**
@@ -115,12 +116,12 @@ function fieldValue<T>(field: Field<T>): T | undefined {
 }
 
 /** Text for a field that is not ready, or `null` when it has a value to show. */
-function fieldPlaceholder<T>(field: Field<T>): Child {
+function fieldPlaceholder<T>(t: Translate, field: Field<T>): Child {
   if (field.status === 'error') {
-    return h('span', { class: 'bad', attrs: { title: field.error } }, 'read failed');
+    return h('span', { class: 'bad', attrs: { title: field.error } }, t('field.readFailed'));
   }
   if (fieldValue(field) !== undefined) return null;
-  return h('span', { class: 'pending' }, field.status === 'loading' ? 'reading' : 'not read');
+  return h('span', { class: 'pending' }, t(field.status === 'loading' ? 'field.reading' : 'field.notRead'));
 }
 
 interface RowOptions {
@@ -140,6 +141,7 @@ function noteId(key: string): string {
  */
 function switchRow(
   ui: PaneUi,
+  t: Translate,
   key: string,
   title: string,
   on: boolean | undefined,
@@ -173,7 +175,7 @@ function switchRow(
       options.note === undefined
         ? null
         : h('p', { class: 'row-note', attrs: { id: noteId(key) } }, options.note),
-      options.field === undefined ? null : fieldPlaceholder(options.field),
+      options.field === undefined ? null : fieldPlaceholder(t, options.field),
     ),
   );
 }
@@ -188,12 +190,14 @@ interface Choice {
 /** A row with a set of exclusive choices. None is marked while the value is unknown. */
 function choiceRow(
   ui: PaneUi,
+  t: Translate,
   title: string,
   choices: readonly Choice[],
   options: RowOptions & { readonly aside?: Child } = {},
 ): HTMLElement {
   const selected = choices.find((choice) => choice.selected);
-  const moved = turned(ui, `choice-${title}`, selected?.key ?? UNKNOWN);
+  // Named by its choices, not its title: the title changes with the language.
+  const moved = turned(ui, `choice-${choices.map((choice) => choice.key).join('|')}`, selected?.key ?? UNKNOWN);
   return h(
     'div',
     { class: 'row choice-row' },
@@ -203,7 +207,7 @@ function choiceRow(
       h('span', { class: 'row-title' }, title),
       options.note === undefined ? null : h('p', { class: 'row-note' }, options.note),
       options.aside ?? null,
-      options.field === undefined ? null : fieldPlaceholder(options.field),
+      options.field === undefined ? null : fieldPlaceholder(t, options.field),
     ),
     h(
       'div',
@@ -242,7 +246,7 @@ interface Feature {
 }
 
 /** One setting: its picture, its guide, and under them the controls. */
-function feature(ui: PaneUi, spec: Feature): HTMLElement {
+function feature(ui: PaneUi, t: Translate, spec: Feature): HTMLElement {
   const titleId = `feature-${spec.id}`;
   return h(
     'section',
@@ -259,7 +263,7 @@ function feature(ui: PaneUi, spec: Feature): HTMLElement {
         'h3',
         { class: 'feature-title', attrs: { id: titleId } },
         h('span', { class: 'dot-text' }, spec.title),
-        spec.field === undefined ? null : fieldPlaceholder(spec.field),
+        spec.field === undefined ? null : fieldPlaceholder(t, spec.field),
       ),
       h('p', { class: 'guide-lead' }, spec.guide.lead),
       spec.guide.points === undefined
@@ -273,6 +277,8 @@ function feature(ui: PaneUi, spec: Feature): HTMLElement {
 // ── Device pane ─────────────────────────────────────────────────────────────
 
 interface Row {
+  /** Names the row whatever language its label is in, so a change can be told across draws. */
+  readonly key: string;
   readonly label: string;
   readonly value: Child;
   /** Plain text of the value, compared between draws to mark what changed. */
@@ -280,77 +286,89 @@ interface Row {
   readonly unverified?: boolean;
 }
 
+/** What to show for the serial number, which browsers refuse to read. */
+function serialText(t: Translate, device: ConnectedDevice): string {
+  if (device.info.serialNumber !== undefined) return device.info.serialNumber;
+  return t(device.kind === 'ble' ? 'device.serialHidden' : 'device.serialNone');
+}
+
+type RowName = keyof Messages['device']['rows'];
+
 function rowsFor(state: AppState, device: ConnectedDevice): Row[] {
+  const { t } = state.i18n;
+  const none = t('device.none');
+  const label = (name: RowName): Pick<Row, 'key' | 'label'> => ({ key: name, label: t(`device.rows.${name}`) });
   const status = fieldValue(state.status);
-  const pending = fieldPlaceholder(state.status);
-  const statusRow = (label: string, text: string | undefined, unverified = false): Row => ({
-    label,
-    value: pending ?? text ?? 'n/a',
+  const pending = fieldPlaceholder(t, state.status);
+  const statusRow = (name: RowName, text: string | undefined, unverified = false): Row => ({
+    ...label(name),
+    value: pending ?? text ?? none,
     ...(text === undefined ? {} : { text }),
     ...(unverified ? { unverified } : {}),
   });
 
   const rows: Row[] = [
-    statusRow('product number', status?.productNumber),
-    statusRow('stick firmware', status && formatFirmware(status.stickFirmware)),
+    statusRow('productNumber', status?.productNumber),
+    statusRow('stickFirmware', status && formatFirmware(status.stickFirmware)),
   ];
   if (status?.holderError !== undefined) {
     rows.push({
-      label: 'holder',
-      value: h('span', { class: 'bad', attrs: { title: status.holderError } }, 'no answer'),
+      ...label('holder'),
+      value: h('span', { class: 'bad', attrs: { title: status.holderError } }, t('device.rows.holderNoAnswer')),
     });
   } else if (supports(device.model, 'charge-vibration')) {
     rows.push(
-      statusRow('holder product', status?.holderProductNumber),
-      statusRow('holder firmware', status?.holderFirmware && formatFirmware(status.holderFirmware)),
+      statusRow('holderProduct', status?.holderProductNumber),
+      statusRow('holderFirmware', status?.holderFirmware && formatFirmware(status.holderFirmware)),
     );
   }
   rows.push(
     statusRow(
-      'battery voltage',
+      'batteryVoltage',
       status === undefined
         ? undefined
         : status.batteryVoltage === undefined
-          ? 'read failed'
+          ? t('field.readFailed')
           : `${status.batteryVoltage.toFixed(3)}V`,
       true,
     ),
-    { label: 'model number', value: device.info.modelNumber ?? 'n/a' },
-    { label: 'software rev', value: device.info.softwareRevision ?? 'n/a' },
-    { label: 'manufacturer', value: device.info.manufacturerName ?? 'n/a' },
-    { label: 'serial number', value: serialText(device) },
+    { ...label('modelNumber'), value: device.info.modelNumber ?? none },
+    { ...label('softwareRev'), value: device.info.softwareRevision ?? none },
+    { ...label('manufacturer'), value: device.info.manufacturerName ?? none },
+    { ...label('serialNumber'), value: serialText(t, device) },
   );
 
   const diagnosis = fieldValue(state.diagnosis);
   if (state.diagnosis.status !== 'idle') {
-    const waiting = fieldPlaceholder(state.diagnosis);
-    const diagnosisRow = (label: string, text: string | undefined): Row => ({
-      label,
-      value: waiting ?? text ?? 'n/a',
+    const waiting = fieldPlaceholder(t, state.diagnosis);
+    const diagnosisRow = (name: RowName, text: string | undefined): Row => ({
+      ...label(name),
+      value: waiting ?? text ?? none,
       ...(text === undefined ? {} : { text }),
       unverified: true,
     });
     rows.push(
-      diagnosisRow('total puffs', diagnosis?.puffCount?.toString()),
-      diagnosisRow('days used', diagnosis?.daysUsed?.toString()),
+      diagnosisRow('totalPuffs', diagnosis?.puffCount?.toString()),
+      diagnosisRow('daysUsed', diagnosis?.daysUsed?.toString()),
     );
   }
   return rows;
 }
 
 /** Whether `text` differs from what the row showed when the command began. */
-function changedSince(memory: Memory, label: string, text: string | undefined): boolean {
+function changedSince(memory: Memory, key: string, text: string | undefined): boolean {
   if (text === undefined) return false;
-  const before = memory.baseline.get(label);
-  memory.latest.set(label, text);
+  const before = memory.baseline.get(key);
+  memory.latest.set(key, text);
   return before !== undefined && before !== text;
 }
 
 function batteryReading(state: AppState, ui: PaneUi): HTMLElement {
+  const { t } = state.i18n;
   const level = fieldValue(state.battery);
-  const placeholder = fieldPlaceholder(state.battery);
+  const placeholder = fieldPlaceholder(t, state.battery);
   if (placeholder !== null || level === undefined) {
-    return h('p', { class: 'battery' }, h('span', { class: 'battery-label' }, 'Battery '), placeholder);
+    return h('p', { class: 'battery' }, h('span', { class: 'battery-label' }, t('device.batteryPending')), placeholder);
   }
   const changed = changedSince(ui.memory, 'battery', String(level));
   return h(
@@ -362,7 +380,7 @@ function batteryReading(state: AppState, ui: PaneUi): HTMLElement {
       String(level),
       h('span', { class: 'battery-unit' }, '%'),
     ),
-    h('span', { class: 'battery-label' }, ' battery'),
+    h('span', { class: 'battery-label' }, t('device.batteryAfterLevel')),
   );
 }
 
@@ -375,6 +393,7 @@ function knownLevel(state: AppState): number | null {
 export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
   const device = state.device;
   if (device === null) return [];
+  const { t } = state.i18n;
 
   const level = knownLevel(state);
   const picture = ui.stage.screen(
@@ -392,7 +411,10 @@ export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
         class: 'device-art',
         attrs: {
           role: 'img',
-          'aria-label': `${modelLabel(device.model)}, ${level === null ? 'battery not read' : `battery ${level}%`}`,
+          'aria-label': t('device.art', {
+            model: modelLabel(device.model),
+            battery: level === null ? t('device.artUnknown') : t('device.artLevel', { level }),
+          }),
         },
       },
       picture.element,
@@ -406,7 +428,7 @@ export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
         'p',
         { class: 'chips' },
         h('span', { class: 'chip' }, modelLabel(device.model)),
-        h('span', { class: 'chip' }, device.kind === 'ble' ? 'Bluetooth' : 'Simulated'),
+        h('span', { class: 'chip' }, t(device.kind === 'ble' ? 'device.bluetooth' : 'device.simulated')),
         device.label === undefined ? null : h('span', { class: 'chip' }, device.label),
       ),
     ),
@@ -415,14 +437,14 @@ export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
   const rows = rowsFor(state, device);
   const list = h('dl', { class: 'registers' });
   for (const row of rows) {
-    const changed = changedSince(ui.memory, row.label, row.text);
+    const changed = changedSince(ui.memory, row.key, row.text);
     list.append(
       h('dt', {}, row.label),
       h(
         'dd',
         { class: changed ? 'changed' : '' },
         row.value,
-        row.unverified ? h('span', { class: 'unverified', attrs: { title: 'unverified reading' } }, ' *') : null,
+        row.unverified ? h('span', { class: 'unverified', attrs: { title: t('device.unverified') } }, ' *') : null,
       ),
     );
   }
@@ -439,19 +461,19 @@ export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
         },
       },
     },
-    h('summary', { key: 'details-summary' }, 'Details'),
+    h('summary', { key: 'details-summary' }, t('device.details')),
     list,
     rows.some((row) => row.unverified)
       ? h(
           'p',
           { class: 'footnote' },
-          '* Decoded the way the iqos CLI does. The upstream project has not confirmed what these numbers measure.',
+          t('device.unverifiedNote'),
         )
       : null,
     h(
       'p',
       { class: 'footnote log-note' },
-      'Reporting a problem? The session log lists what each control sent and every frame that came back. ',
+      t('device.logNote'),
       h(
         'button',
         {
@@ -460,7 +482,7 @@ export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
           attrs: { type: 'button' },
           on: { click: (event) => ui.copyLog(event.currentTarget as HTMLButtonElement) },
         },
-        'Copy session log',
+        t('device.copyLog'),
       ),
     ),
   );
@@ -468,33 +490,29 @@ export function devicePane(state: AppState, run: Run, ui: PaneUi): Child[] {
   return [
     hero,
     device.kind === 'simulated'
-      ? h('p', { class: 'device-note' }, 'This device is simulated. Nothing is transmitted.')
+      ? h('p', { class: 'device-note' }, t('device.simulatedNote'))
       : null,
-    device.detectedModel === 'unknown' ? modelPicker(device, run) : null,
+    device.detectedModel === 'unknown' ? modelPicker(device, run, t) : null,
     h(
       'div',
       { class: 'actions' },
-      button('refresh', 'Refresh', () => run('refresh')),
-      button('diagnosis', 'Read diagnosis', () => {
+      button('refresh', t('device.refresh'), () => run('refresh')),
+      button('diagnosis', t('device.readDiagnosis'), () => {
         // The readings land in the details list; make sure it is in view.
         ui.detailsOpen = true;
         run('diagnosis');
       }),
-      button('disconnect', 'Disconnect', () => run('disconnect'), 'danger'),
+      button('disconnect', t('device.disconnect'), () => run('disconnect'), 'danger'),
     ),
     details,
   ];
 }
 
-function modelPicker(device: ConnectedDevice, run: Run): HTMLElement {
+function modelPicker(device: ConnectedDevice, run: Run, t: Translate): HTMLElement {
   return h(
     'div',
     { class: 'notice' },
-    h(
-      'p',
-      {},
-      `The name "${device.name}" does not say which model this is. Choose it to unlock its settings:`,
-    ),
+    h('p', {}, t('device.chooseModel', { name: device.name })),
     h(
       'div',
       { class: 'options' },
@@ -515,7 +533,7 @@ function modelPicker(device: ConnectedDevice, run: Run): HTMLElement {
 }
 
 /** Form that saves the connected device under a label. */
-export function saveForm(device: ConnectedDevice, run: Run): HTMLElement {
+export function saveForm(device: ConnectedDevice, run: Run, t: Translate): HTMLElement {
   const input = h('input', {
     key: 'save-label',
     attrs: {
@@ -526,7 +544,7 @@ export function saveForm(device: ConnectedDevice, run: Run): HTMLElement {
       autocomplete: 'off',
       autocapitalize: 'off',
       spellcheck: 'false',
-      placeholder: device.label ?? 'label',
+      placeholder: device.label ?? t('device.labelPlaceholder'),
     },
   });
   return h(
@@ -543,12 +561,12 @@ export function saveForm(device: ConnectedDevice, run: Run): HTMLElement {
         },
       },
     },
-    h('label', { attrs: { for: 'save-label' } }, 'Save this device as'),
+    h('label', { attrs: { for: 'save-label' } }, t('device.saveAs')),
     h(
       'div',
       { class: 'inline-form-fields' },
       input,
-      h('button', { class: 'button', key: 'save-submit', attrs: { type: 'submit' } }, 'Save'),
+      h('button', { class: 'button', key: 'save-submit', attrs: { type: 'submit' } }, t('device.save')),
     ),
   );
 }
@@ -556,19 +574,18 @@ export function saveForm(device: ConnectedDevice, run: Run): HTMLElement {
 // ── Settings pane ───────────────────────────────────────────────────────────
 
 /** What to say about a setting the device cannot be asked about. */
-function lastSet(value: boolean | null, whenTrue: string, whenFalse: string): HTMLElement {
+function lastSet(t: Translate, value: boolean | null, whenTrue: MessageKey, whenFalse: MessageKey): HTMLElement {
   return h(
     'p',
     { class: 'row-note aside' },
-    value === null
-      ? 'The device does not report this setting.'
-      : `Last set here: ${value ? whenTrue : whenFalse}.`,
+    value === null ? t('settings.notReported') : t('settings.lastSet', { value: t(value ? whenTrue : whenFalse) }),
   );
 }
 
 export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
   const device = state.device;
   if (device === null) return [];
+  const { t } = state.i18n;
   const can = (capability: Capability): boolean => supports(device.model, capability);
   const { allInOne } = deviceForm(device.model);
   const features: Feature[] = [];
@@ -577,22 +594,20 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
     const level = fieldValue(state.brightness);
     features.push({
       id: 'light',
-      title: 'Light',
+      title: t('settings.light.title'),
       scene: brightnessScene(level),
       guide: {
-        lead: 'How strongly the status lights shine.',
-        points: [
-          'Low is easier on the eyes in the dark.',
-          'High is easier to read in daylight.',
-        ],
+        lead: t('settings.light.lead'),
+        points: [t('settings.light.low'), t('settings.light.high')],
       },
       rows: [
         choiceRow(
           ui,
-          'Brightness',
+          t,
+          t('settings.light.brightness'),
           [
-            { key: 'brightness-low', label: 'Low', selected: level === 'low', choose: () => run('brightness low') },
-            { key: 'brightness-high', label: 'High', selected: level === 'high', choose: () => run('brightness high') },
+            { key: 'brightness-low', label: t('settings.light.optionLow'), selected: level === 'low', choose: () => run('brightness low') },
+            { key: 'brightness-high', label: t('settings.light.optionHigh'), selected: level === 'high', choose: () => run('brightness high') },
           ],
           { field: state.brightness },
         ),
@@ -604,26 +619,23 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
     const settings = fieldValue(state.vibration);
     const withCharge = can('charge-vibration');
     const flags: readonly (readonly [string, string, boolean | undefined])[] = [
-      ['heating', 'Heating starts', settings?.heating],
-      ['starting', 'A session starts', settings?.starting],
-      ['puffend', 'A session is ending', settings?.puffEnd],
-      ['terminated', 'A session is stopped by hand', settings?.terminated],
-      ...(withCharge ? ([['charge', 'Charging starts', settings?.charge]] as const) : []),
+      ['heating', t('settings.vibration.heating'), settings?.heating],
+      ['starting', t('settings.vibration.starting'), settings?.starting],
+      ['puffend', t('settings.vibration.puffEnd'), settings?.puffEnd],
+      ['terminated', t('settings.vibration.terminated'), settings?.terminated],
+      ...(withCharge ? ([['charge', t('settings.vibration.charge'), settings?.charge]] as const) : []),
     ];
     features.push({
       id: 'vibration',
-      title: 'Vibration',
+      title: t('settings.vibration.title'),
       scene: vibrationScene(flags.filter(([, , on]) => on === true).length, flags.length, allInOne),
       guide: {
-        lead: 'The device taps out where a session stands, so you can follow it without looking. Choose which moments it marks.',
-        points: [
-          'Each signal is separate: keep the ones you rely on, silence the rest.',
-          'Switching every signal off makes the device silent, not disabled.',
-        ],
+        lead: t('settings.vibration.lead'),
+        points: [t('settings.vibration.separate'), t('settings.vibration.silent')],
       },
       field: state.vibration,
       rows: flags.map(([key, title, on]) =>
-        switchRow(ui, `vibration-${key}`, title, on, () => run(`vibration ${key} ${on === true ? 'off' : 'on'}`)),
+        switchRow(ui, t, `vibration-${key}`, title, on, () => run(`vibration ${key} ${on === true ? 'off' : 'on'}`)),
       ),
     });
   }
@@ -632,14 +644,14 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
     const enabled = fieldValue(state.autostart);
     features.push({
       id: 'auto-start',
-      title: 'Auto start',
+      title: t('settings.autoStart.title'),
       scene: autoStartScene(enabled, allInOne),
       guide: {
-        lead: 'With auto start on, heating begins the moment a stick is inserted.',
-        points: ['With it off, insert the stick and hold the button to start a session yourself.'],
+        lead: t('settings.autoStart.lead'),
+        points: [t('settings.autoStart.byHand')],
       },
       rows: [
-        switchRow(ui, 'autostart', 'Auto start', enabled, () => run(`autostart ${enabled === true ? 'off' : 'on'}`), {
+        switchRow(ui, t, 'autostart', t('settings.autoStart.title'), enabled, () => run(`autostart ${enabled === true ? 'off' : 'on'}`), {
           field: state.autostart,
         }),
       ],
@@ -650,17 +662,14 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
     const enabled = fieldValue(state.flexpuff);
     features.push({
       id: 'flexpuff',
-      title: 'FlexPuff',
+      title: t('settings.flexPuff.title'),
       scene: flexPuffScene(enabled),
       guide: {
-        lead: 'Near the end of a session the device checks whether the stick is used up. If it is not, FlexPuff can add up to four puffs.',
-        points: [
-          'It follows your pace, so not every session is extended.',
-          'A session that was paused is not extended.',
-        ],
+        lead: t('settings.flexPuff.lead'),
+        points: [t('settings.flexPuff.pace'), t('settings.flexPuff.paused')],
       },
       rows: [
-        switchRow(ui, 'flexpuff', 'FlexPuff', enabled, () => run(`flexpuff ${enabled === true ? 'disable' : 'enable'}`), {
+        switchRow(ui, t, 'flexpuff', t('settings.flexPuff.title'), enabled, () => run(`flexpuff ${enabled === true ? 'disable' : 'enable'}`), {
           field: state.flexpuff,
         }),
       ],
@@ -670,34 +679,32 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
   if (can('smartgesture')) {
     features.push({
       id: 'gestures',
-      title: 'Smart gesture',
+      title: t('settings.gesture.title'),
       scene: gestureScene(state.smartGesture, allInOne),
       guide: {
-        lead: 'Gestures let the device answer without its button.',
-        points: [
-          'Lift it between sessions and its lights show how many uses are left.',
-          'Double-tap it during a session and it vibrates to say how much remains.',
-        ],
+        lead: t('settings.gesture.lead'),
+        points: [t('settings.gesture.lift'), t('settings.gesture.tap')],
       },
       rows: [
         choiceRow(
           ui,
-          'Smart gesture',
+          t,
+          t('settings.gesture.title'),
           [
             {
               key: 'smartgesture-enable',
-              label: 'On',
+              label: t('settings.gesture.on'),
               selected: state.smartGesture === true,
               choose: () => run('smartgesture enable'),
             },
             {
               key: 'smartgesture-disable',
-              label: 'Off',
+              label: t('settings.gesture.off'),
               selected: state.smartGesture === false,
               choose: () => run('smartgesture disable'),
             },
           ],
-          { aside: lastSet(state.smartGesture, 'on', 'off') },
+          { aside: lastSet(t, state.smartGesture, 'settings.value.on', 'settings.value.off') },
         ),
       ],
     });
@@ -707,33 +714,33 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
     const settings = fieldValue(state.flexbattery);
     features.push({
       id: 'battery',
-      title: 'FlexBattery',
+      title: t('settings.flexBattery.title'),
       scene: batteryScene(settings?.mode, settings?.pause),
       guide: {
-        lead: 'How the holder spends a charge.',
+        lead: t('settings.flexBattery.lead'),
         points: [
-          'Performance: up to three sessions in a row before the holder goes back in the charger.',
-          'Eco: one session per charge, which is gentler on the battery over its life. Pause is not available.',
-          'Pause mode: put a session on hold for up to eight minutes. With it on, Performance gives two sessions in a row.',
+          t('settings.flexBattery.performance'),
+          t('settings.flexBattery.eco'),
+          t('settings.flexBattery.pause'),
         ],
       },
       field: state.flexbattery,
       rows: [
-        choiceRow(ui, 'Mode', [
+        choiceRow(ui, t, t('settings.flexBattery.mode'), [
           {
             key: 'flexbattery-performance',
-            label: 'Performance',
+            label: t('settings.flexBattery.optionPerformance'),
             selected: settings?.mode === 'performance',
             choose: () => run('flexbattery performance'),
           },
           {
             key: 'flexbattery-eco',
-            label: 'Eco',
+            label: t('settings.flexBattery.optionEco'),
             selected: settings?.mode === 'eco',
             choose: () => run('flexbattery eco'),
           },
         ]),
-        switchRow(ui, 'flexbattery-pause', 'Pause mode', settings?.pause, () =>
+        switchRow(ui, t, 'flexbattery-pause', t('settings.flexBattery.pauseMode'), settings?.pause, () =>
           run(`flexbattery pause ${settings?.pause === true ? 'off' : 'on'}`),
         ),
       ],
@@ -743,21 +750,22 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
   if (can('lock')) {
     features.push({
       id: 'lock',
-      title: 'Lock',
+      title: t('settings.lock.title'),
       scene: lockScene(state.locked),
       guide: {
-        lead: 'A locked device cannot be used until it is unlocked again.',
-        points: ['Lock it before you lend it out or put it away, and unlock it here when you want it back.'],
+        lead: t('settings.lock.lead'),
+        points: [t('settings.lock.lend')],
       },
       rows: [
         choiceRow(
           ui,
-          'Lock',
+          t,
+          t('settings.lock.title'),
           [
-            { key: 'unlock', label: 'Unlocked', selected: state.locked === false, choose: () => run('unlock') },
-            { key: 'lock', label: 'Locked', selected: state.locked === true, choose: () => run('lock') },
+            { key: 'unlock', label: t('settings.lock.unlocked'), selected: state.locked === false, choose: () => run('unlock') },
+            { key: 'lock', label: t('settings.lock.locked'), selected: state.locked === true, choose: () => run('lock') },
           ],
-          { aside: lastSet(state.locked, 'locked', 'unlocked') },
+          { aside: lastSet(t, state.locked, 'settings.value.locked', 'settings.value.unlocked') },
         ),
       ],
     });
@@ -765,11 +773,11 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
 
   features.push({
     id: 'find',
-    title: 'Find my IQOS',
+    title: t('settings.find.title'),
     scene: findScene(state.finding),
     guide: {
-      lead: 'Mislaid it nearby? Make it vibrate and follow the sound.',
-      points: ['It keeps vibrating until you stop it, and it has to be connected to hear you.'],
+      lead: t('settings.find.lead'),
+      points: [t('settings.find.keeps')],
     },
     rows: [
       h(
@@ -778,16 +786,16 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
         h(
           'div',
           { class: 'row-text' },
-          h('span', { class: 'row-title' }, 'Vibrate'),
+          h('span', { class: 'row-title' }, t('settings.find.vibrate')),
           h(
             'p',
             { class: `row-note${state.finding ? ' alarm-text' : ''}` },
-            state.finding ? 'The device is vibrating.' : 'Off',
+            t(state.finding ? 'settings.find.vibrating' : 'settings.find.off'),
           ),
         ),
         state.finding
-          ? button('find', 'Stop vibrating', () => run(''), 'alarm')
-          : button('find', 'Start vibrating', () => run('findmyiqos')),
+          ? button('find', t('settings.find.stop'), () => run(''), 'alarm')
+          : button('find', t('settings.find.start'), () => run('findmyiqos')),
       ),
     ],
   });
@@ -795,23 +803,29 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
   const children: Child[] = [
     h(
       'nav',
-      { class: 'jump', attrs: { 'aria-label': 'Settings' } },
+      { class: 'jump', attrs: { 'aria-label': t('settings.nav') } },
       ...features.map((spec) => h('a', { key: `jump-${spec.id}`, attrs: { href: `#${spec.id}` } }, spec.title)),
     ),
-    h('div', { class: 'features' }, ...features.map((spec) => feature(ui, spec))),
+    h('div', { class: 'features' }, ...features.map((spec) => feature(ui, t, spec))),
   ];
 
   const missing = (Object.keys(FEATURE_NAMES) as Capability[])
     .filter((capability) => !can(capability))
-    .map((capability) => FEATURE_NAMES[capability]);
+    .flatMap((capability) => {
+      const name = FEATURE_NAMES[capability];
+      return name === undefined ? [] : [t(name)];
+    });
   if (missing.length > 0) {
     children.push(
       h(
         'p',
         { class: 'footnote' },
         device.model === 'unknown'
-          ? 'Settings appear once the model is known.'
-          : `Not on ${modelLabel(device.model)}: ${missing.join(', ')}.`,
+          ? t('settings.missing.unknownModel')
+          : t('settings.missing.notOn', {
+              model: modelLabel(device.model),
+              features: missing.join(t('settings.missing.separator')),
+            }),
       ),
     );
   }
@@ -822,7 +836,7 @@ export function settingsPane(state: AppState, run: Run, ui: PaneUi): Child[] {
  * One tile per supported model. With a simulator (`simulate`), each tile is a
  * button that starts it as that model; without one, the tiles are pictures.
  */
-export function modelTiles(stage: Stage, simulate: Run | null): Child[] {
+export function modelTiles(stage: Stage, simulate: Run | null, t: Translate): Child[] {
   return KNOWN_MODELS.map((model) => {
     const content: Child[] = [
       stage.screen(`tile-${model}`, DEVICE_COLUMNS, DEVICE_ROWS, deviceScene(model, { level: 72, finding: false }))
@@ -835,7 +849,7 @@ export function modelTiles(stage: Stage, simulate: Run | null): Child[] {
       {
         class: 'model-tile',
         key: `tile-${model}`,
-        attrs: { type: 'button', title: `Try a simulated ${modelLabel(model)}` },
+        attrs: { type: 'button', title: t('page.demoTile', { model: modelLabel(model) }) },
         on: { click: () => simulate(`demo ${model}`) },
       },
       ...content,
@@ -847,6 +861,7 @@ export function modelTiles(stage: Stage, simulate: Run | null): Child[] {
 
 export function savedDevices(state: AppState, run: Run): Child[] {
   const { book } = state;
+  const { t } = state.i18n;
   const labels = sortedLabels(book);
   if (labels.length === 0 && book.last === undefined) return [];
 
@@ -864,22 +879,22 @@ export function savedDevices(state: AppState, run: Run): Child[] {
           h('span', { class: 'saved-label' }, label),
           h('span', { class: 'saved-name' }, `${device.name} (${modelLabel(device.model)})`),
         ),
-        button(`connect-${label}`, 'Connect', () => run(`connect ${label}`)),
-        button(`forget-${label}`, 'Forget', () => run(`device remove ${label}`), 'quiet'),
+        button(`connect-${label}`, t('saved.connect'), () => run(`connect ${label}`)),
+        button(`forget-${label}`, t('saved.forget'), () => run(`device remove ${label}`), 'quiet'),
       ),
     );
   }
 
   const children: Child[] = [];
   if (labels.length > 0) {
-    children.push(h('h2', { class: 'card-title dot-text' }, 'Saved devices'), list);
+    children.push(h('h2', { class: 'card-title dot-text' }, t('saved.title')), list);
   }
   if (book.last !== undefined) {
     children.push(
       h(
         'p',
         { class: 'last-device' },
-        `Last connected: ${book.last.name}. `,
+        t('saved.last', { name: book.last.name }),
         h(
           'button',
           {
@@ -888,10 +903,10 @@ export function savedDevices(state: AppState, run: Run): Child[] {
             attrs: { type: 'button' },
             on: { click: () => run('connect --last') },
           },
-          'Reconnect',
+          t('saved.reconnect'),
         ),
       ),
     );
   }
-  return [h('section', { class: 'card saved-card', attrs: { 'aria-label': 'Saved devices' } }, ...children)];
+  return [h('section', { class: 'card saved-card', attrs: { 'aria-label': t('saved.title') } }, ...children)];
 }

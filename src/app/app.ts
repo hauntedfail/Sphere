@@ -8,6 +8,8 @@
  */
 import { parseCommand, type ConnectTarget } from '../console/parse';
 import { Iqos } from '../device/iqos';
+import { ENGLISH, type I18n } from '../i18n/i18n';
+import type { Locale } from '../i18n/locales';
 import { SphereError, describeError, transportError, usageError } from '../protocol/errors';
 import { type DeviceModel, modelFromLocalName, modelLabel } from '../protocol/model';
 import {
@@ -41,6 +43,10 @@ export interface AppDeps {
   readonly now?: () => number;
   /** The simulated device. Debug builds pass one; production builds do not. */
   readonly simulator?: SimulatorGateway | null;
+  /** The language to start in. English when left out. */
+  readonly i18n?: I18n;
+  /** Fetches another language. The real loader when left out. */
+  readonly loadI18n?: (locale: Locale) => Promise<I18n>;
 }
 
 export type FieldKey =
@@ -86,7 +92,7 @@ export class App {
     this.canSimulate = (deps.simulator ?? null) !== null;
     this.now = deps.now ?? Date.now;
     const support = deps.bluetooth?.support() ?? 'unsupported';
-    this.store = createStore(initialState(support, loadBook(deps.storage)));
+    this.store = createStore(initialState(support, loadBook(deps.storage), deps.i18n ?? ENGLISH));
   }
 
   /**

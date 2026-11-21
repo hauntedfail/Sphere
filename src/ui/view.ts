@@ -1,6 +1,8 @@
 /** Binds the page to the app: draws state, forwards input. */
 import type { App } from '../app/app';
 import type { AppState, ConsoleLine } from '../app/state';
+import type { Translate } from '../i18n/i18n';
+import type { MessageKey } from '../i18n/messages/en';
 import { modelLabel } from '../protocol/model';
 import { byId, h, redraw } from './dom';
 import { createStage } from './dots';
@@ -16,18 +18,17 @@ import {
   settingsPane,
 } from './panes';
 import { GLOBE_SIZE, globeScene } from './scenes';
+import { applyStaticText } from './static';
 
-const SUPPORT_NOTICE: Record<AppState['support'], string> = {
-  ok: '',
-  unsupported:
-    'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android. On an iPhone or iPad, use Bluefy.',
-  insecure: 'Bluetooth only works on a secure page. Open Sphere over HTTPS or from localhost.',
+/** What to say where Bluetooth cannot be used. `null` where it can. */
+const SUPPORT_NOTICE: Record<AppState['support'], MessageKey | null> = {
+  ok: null,
+  unsupported: 'notice.unsupported',
+  insecure: 'notice.insecure',
 };
-/** Added to a support notice in builds that carry the simulator. */
-const SIMULATOR_STILL_WORKS = ' The simulated device still works here.';
 
 /** Which parts of the state each region depends on. */
-const DEVICE_KEYS = ['device', 'battery', 'status', 'diagnosis', 'finding'] as const;
+const DEVICE_KEYS = ['device', 'battery', 'status', 'diagnosis', 'finding', 'i18n'] as const;
 const SETTINGS_KEYS = [
   'device',
   'brightness',
@@ -38,6 +39,7 @@ const SETTINGS_KEYS = [
   'smartGesture',
   'locked',
   'finding',
+  'i18n',
 ] as const;
 
 const TOAST_MS = 3600;
@@ -48,18 +50,22 @@ function changed(state: AppState, previous: AppState | null, keys: readonly (key
   return previous === null || keys.some((key) => state[key] !== previous[key]);
 }
 
-function titleState(state: AppState): string {
+type TitleState = 'connecting' | 'vibrating' | 'working' | 'ready' | 'idle';
+
+/** What the page is doing. The name is also what the stylesheet reads, so it is not translated. */
+function titleState(state: AppState): TitleState {
   if (state.phase === 'connecting') return 'connecting';
   if (state.finding) return 'vibrating';
   if (state.busy > 0) return 'working';
   return state.phase === 'connected' ? 'ready' : 'idle';
 }
 
-function titleDevice(state: AppState): string {
+function titleDevice(state: AppState, t: Translate): string {
   const device = state.device;
-  if (device === null) return 'not connected';
+  if (device === null) return t('bar.notConnected');
   const label = device.label === undefined ? '' : ` [${device.label}]`;
-  return `${device.kind === 'simulated' ? 'simulated ' : ''}${modelLabel(device.model)}${label}`;
+  const model = modelLabel(device.model);
+  return `${device.kind === 'simulated' ? t('bar.simulated', { model }) : model}${label}`;
 }
 
 /**
@@ -93,16 +99,20 @@ export function mount(app: App): void {
 
   const wide = typeof matchMedia === 'function' && matchMedia(WIDE_LAYOUT).matches;
   const ui = createPaneUi(stage, wide, (button) => {
+    // The language is read when each word is shown: it may change in between.
+    const say = (key: MessageKey): void => {
+      button.textContent = app.store.get().i18n.t(key);
+    };
     const restore = (): void => {
-      setTimeout(() => (button.textContent = 'Copy session log'), 1800);
+      setTimeout(() => say('device.copyLog'), 1800);
     };
     navigator.clipboard.writeText(sessionLog(app.store.get(), app.version)).then(
       () => {
-        button.textContent = 'Copied';
+        say('device.copied');
         restore();
       },
       () => {
-        button.textContent = 'Copy failed';
+        say('device.copyFailed');
         restore();
       },
     );
@@ -163,37 +173,46 @@ export function mount(app: App): void {
   const connectControls: HTMLElement[] = [connectButton, connectAllButton];
 
   // The simulator's controls exist only in builds that carry the simulator.
+  // They carry the same attribute as the words in index.html, so they are
+  // filled, and filled again when the language changes, along with those.
   const tiles = byId('model-tiles');
   if (app.canSimulate) {
-    const demoButton = h(
-      'button',
-      { class: 'button', attrs: { type: 'button', id: 'demo-button' }, on: { click: () => run('demo') } },
-      'Try a simulated device',
-    );
+    const demoButton = h('button', {
+      class: 'button',
+      attrs: { type: 'button', id: 'demo-button', 'data-i18n': 'page.demo' },
+      on: { click: () => run('demo') },
+    });
     connectButton.after(demoButton);
     connectControls.push(demoButton);
-    tiles.before(h('p', { class: 'card-lead' }, 'No device at hand? Pick a model to try it simulated.'));
+    tiles.before(h('p', { class: 'card-lead', attrs: { 'data-i18n': 'page.demoLead' } }));
   }
-  redraw(tiles, modelTiles(stage, app.canSimulate ? run : null));
 
   // ── Drawing ───────────────────────────────────────────────────────────────
 
   const draw = (state: AppState, previous: AppState | null): void => {
     const connected = state.phase === 'connected';
+    const { t } = state.i18n;
 
-    if (changed(state, previous, ['phase'])) {
+    // First, because it also resets the few elements that the blocks below
+    // then write over with the state of the moment.
+    if (changed(state, previous, ['i18n'])) {
+      applyStaticText(document, t);
+      redraw(tiles, modelTiles(stage, app.canSimulate ? run : null, t));
+    }
+
+    if (changed(state, previous, ['phase', 'i18n'])) {
       intro.hidden = connected;
       workspace.hidden = !connected;
-      if (!connected) resetPaneUi(ui);
+      if (!connected && changed(state, previous, ['phase'])) resetPaneUi(ui);
 
       const connecting = state.phase === 'connecting';
-      connectButton.textContent = connecting ? 'Connecting' : 'Connect a device';
+      connectButton.textContent = t(connecting ? 'page.connecting' : 'page.connect');
       for (const control of connectControls) {
         control.setAttribute('aria-disabled', String(connecting));
       }
       // Moving between the intro and the workspace removes whatever had
       // focus, so start at the top of the view that just appeared.
-      if (previous !== null && (connected || previous.phase === 'connected')) {
+      if (previous !== null && previous.phase !== state.phase && (connected || previous.phase === 'connected')) {
         main.focus({ preventScroll: true });
         if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
       }
@@ -202,32 +221,32 @@ export function mount(app: App): void {
     // A command is starting: readings that differ from now on are news.
     if (previous !== null && previous.busy === 0 && state.busy > 0) commitMemory(ui.memory);
 
-    if (changed(state, previous, ['support'])) {
+    if (changed(state, previous, ['support', 'i18n'])) {
       const notice = SUPPORT_NOTICE[state.support];
       supportNotice.textContent =
-        notice !== '' && app.canSimulate ? `${notice}${SIMULATOR_STILL_WORKS}` : notice;
+        notice === null ? '' : `${t(notice)}${app.canSimulate ? t('notice.simulatorStillWorks') : ''}`;
       supportNotice.hidden = state.support === 'ok';
       connectButton.hidden = state.support !== 'ok';
       connectAllButton.hidden = state.support !== 'ok';
       connectAllRow.hidden = state.support !== 'ok';
     }
 
-    if (changed(state, previous, ['phase', 'device', 'busy', 'finding'])) {
-      titleDeviceElement.textContent = titleDevice(state);
-      titleStateElement.textContent = titleState(state);
+    if (changed(state, previous, ['phase', 'device', 'busy', 'finding', 'i18n'])) {
+      titleDeviceElement.textContent = titleDevice(state, t);
+      titleStateElement.textContent = t(`bar.state.${titleState(state)}`);
       titleStateElement.dataset['state'] = titleState(state);
       bar.dataset['busy'] = String(state.busy > 0 || state.phase === 'connecting');
       workspace.dataset['finding'] = String(state.finding);
     }
 
-    if (changed(state, previous, ['book', 'phase'])) {
+    if (changed(state, previous, ['book', 'phase', 'i18n'])) {
       redraw(savedContainer, connected ? [] : savedDevices(state, run));
     }
     // The save form lives outside the device pane so that a reading arriving
     // mid-keystroke does not rebuild the field the user is typing in.
-    if (changed(state, previous, ['device'])) {
+    if (changed(state, previous, ['device', 'i18n'])) {
       const device = state.device;
-      redraw(saveContainer, device?.kind === 'ble' ? [saveForm(device, run)] : []);
+      redraw(saveContainer, device?.kind === 'ble' ? [saveForm(device, run, t)] : []);
     }
     if (changed(state, previous, DEVICE_KEYS)) {
       redraw(deviceContainer, devicePane(state, run, ui));
