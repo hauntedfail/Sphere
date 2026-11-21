@@ -239,7 +239,10 @@ function parseDevice(args: readonly string[]): DeviceAction {
       if (label !== undefined) throw usageError('Usage: device list');
       return { kind: 'list' };
     case 'save':
-      if (label === undefined || extra.length > 0) throw usageError('Usage: device save <label>');
+      // The one mistake a control can make here: a label typed in two words.
+      if (label === undefined || extra.length > 0) {
+        throw usageError('Usage: device save <label>', { key: 'error.saveUsage' });
+      }
       return { kind: 'save', label };
     case 'remove':
       if (label === undefined || extra.length > 0) throw usageError('Usage: device remove <label>');

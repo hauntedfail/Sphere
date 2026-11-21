@@ -36,7 +36,7 @@ const MAX_DEVICES = 64;
 /** Trim a label. Labels must not be empty. */
 export function normalizeLabel(label: string): string {
   const trimmed = label.trim();
-  if (trimmed === '') throw usageError('Invalid label: label must not be empty');
+  if (trimmed === '') throw usageError('Invalid label: label must not be empty', { key: 'error.label.empty' });
   return trimmed;
 }
 
@@ -44,13 +44,19 @@ export function normalizeLabel(label: string): string {
 export function validateLabel(label: string): string {
   const trimmed = normalizeLabel(label);
   if (trimmed.length > MAX_LABEL_LENGTH) {
-    throw usageError(`Invalid label: use at most ${MAX_LABEL_LENGTH} characters`);
+    throw usageError(`Invalid label: use at most ${MAX_LABEL_LENGTH} characters`, {
+      key: 'error.label.tooLong',
+      params: { max: MAX_LABEL_LENGTH },
+    });
   }
   if (!/^[\p{L}\p{N}._-]+$/u.test(trimmed)) {
-    throw usageError('Invalid label: use letters, digits, ".", "_" or "-"');
+    throw usageError('Invalid label: use letters, digits, ".", "_" or "-"', { key: 'error.label.characters' });
   }
   if (parseModelSelector(trimmed) !== null) {
-    throw usageError(`Invalid label: ${trimmed} is reserved for model selection`);
+    throw usageError(`Invalid label: ${trimmed} is reserved for model selection`, {
+      key: 'error.label.reserved',
+      params: { label: trimmed },
+    });
   }
   return trimmed;
 }
@@ -58,7 +64,10 @@ export function validateLabel(label: string): string {
 export function withDevice(book: DeviceBook, label: string, device: SavedDevice): DeviceBook {
   const key = validateLabel(label);
   if (!Object.hasOwn(book.devices, key) && Object.keys(book.devices).length >= MAX_DEVICES) {
-    throw usageError(`Cannot save more than ${MAX_DEVICES} devices`);
+    throw usageError(`Cannot save more than ${MAX_DEVICES} devices`, {
+      key: 'error.tooManyDevices',
+      params: { max: MAX_DEVICES },
+    });
   }
   return { ...book, devices: { ...book.devices, [key]: device } };
 }

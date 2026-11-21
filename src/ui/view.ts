@@ -2,6 +2,7 @@
 import type { App } from '../app/app';
 import type { AppState, ConsoleLine } from '../app/state';
 import type { Translate } from '../i18n/i18n';
+import { render } from '../i18n/message';
 import type { MessageKey } from '../i18n/messages/en';
 import { modelLabel } from '../protocol/model';
 import { byId, h, redraw } from './dom';
@@ -140,8 +141,12 @@ export function mount(app: App): void {
     const fresh = lines.filter((line) => line.id > from && line.tone !== 'input' && line.text !== '');
     const failure = fresh.find((line) => line.tone === 'error');
     const [only] = fresh;
-    if (failure !== undefined) toast(failure.text.replace(/^Error: /, ''), 'error');
-    else if (fresh.length === 1 && only !== undefined) toast(only.text, 'out');
+    // A line that carries a message is said in the page's language; any other is shown as printed.
+    const { t } = app.store.get().i18n;
+    const said = (line: ConsoleLine): string =>
+      line.message === undefined ? line.text.replace(/^Error: /, '') : render(t, line.message);
+    if (failure !== undefined) toast(said(failure), 'error');
+    else if (fresh.length === 1 && only !== undefined) toast(said(only), 'out');
   };
 
   /** The button most recently clicked inside the page's main region. */

@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { type Messages, en } from '../src/i18n/messages/en';
 import { applyStaticText } from '../src/ui/static';
-import { BODY, connectedPage, openPage } from './ui-page';
+import type { I18n } from '../src/i18n/i18n';
+import { BODY, bluetoothPage, connectedPage, openPage } from './ui-page';
 
 const keyed = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[data-i18n]')];
 const squash = (text: string | null): string => (text ?? '').replace(/\s+/g, ' ').trim();
@@ -70,5 +71,43 @@ describe('the page in English', () => {
     const page = openPage();
     expect(page.app.store.get().i18n.locale).toBe('en');
     expect(page.text('title-device')).toBe('not connected');
+  });
+});
+
+/** A language that shows each message as its key, so a test can tell where a word came from. */
+const mirror: I18n = {
+  locale: 'ja',
+  t: (key, params) => `⟦${key}${params === undefined || Object.keys(params).length === 0 ? '' : ` ${JSON.stringify(params)}`}⟧`,
+};
+
+describe('what a control answers', () => {
+  it('is shown through the dictionary', async () => {
+    const page = await connectedPage({ i18n: mirror });
+    page.buttonByKey('lock').click();
+    await page.settle();
+    expect(page.text('toasts')).toBe('⟦result.locked⟧');
+  });
+
+  it('is shown through the dictionary when it is a refusal, with what it is about', async () => {
+    const page = await bluetoothPage({ i18n: mirror });
+    const input = document.getElementById('save-label') as HTMLInputElement;
+    input.value = 'a!b';
+    input.form?.dispatchEvent(new Event('submit', { cancelable: true }));
+    await page.settle();
+    expect(page.text('toasts')).toBe('⟦error.label.characters⟧');
+  });
+
+  it('puts a message inside a message into the language first', async () => {
+    const page = await connectedPage({ i18n: mirror });
+    page.buttonByKey('brightness-low').click();
+    await page.settle();
+    expect(page.text('toasts')).toBe('⟦result.brightnessSet {"level":"⟦value.low⟧"}⟧');
+  });
+
+  it('still reads in English as before', async () => {
+    const page = await connectedPage();
+    page.buttonByKey('lock').click();
+    await page.settle();
+    expect(page.text('toasts')).toBe('Device locked');
   });
 });

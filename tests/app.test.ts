@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/app';
-import type { AppState } from '../src/app/state';
+import type { AppState, ConsoleLine } from '../src/app/state';
+import { ENGLISH } from '../src/i18n/i18n';
+import { render } from '../src/i18n/message';
 import { KNOWN_MODELS, modelFromLocalName } from '../src/protocol/model';
 import { STORAGE_KEY, type KeyValueStore } from '../src/storage/devices';
 import type {
@@ -628,5 +630,109 @@ describe('createSimulator', () => {
       expect(modelFromLocalName(simulator.open(model, {}).name)).toBe(model);
     }
     expect(modelFromLocalName(simulator.open('unknown', {}).name)).toBe('unknown');
+  });
+});
+
+describe('messages the page can translate', () => {
+  /** What the controls send, from src/ui/panes.ts and view.ts. The empty line stops Find my IQOS. */
+  const CONTROL_LINES = [
+    'refresh',
+    'diagnosis',
+    'lock',
+    'unlock',
+    'brightness low',
+    'brightness high',
+    'smartgesture disable',
+    'smartgesture enable',
+    'flexpuff disable',
+    'flexpuff enable',
+    'autostart off',
+    'autostart on',
+    'flexbattery eco',
+    'flexbattery performance',
+    'flexbattery pause off',
+    'flexbattery pause on',
+    'vibration heating off',
+    'vibration heating on',
+    'device save desk',
+    'device remove desk',
+    'device remove desk',
+    'device save not a label',
+    'device save a!b',
+    'device save iluma-one',
+    'connect',
+    'connect --last',
+    'findmyiqos',
+    '',
+    'disconnect',
+    'disconnect',
+    'refresh',
+    'connect nowhere',
+  ];
+
+  /** The lines a command printed, apart from the echo of the command itself. */
+  const answers = (lines: readonly ConsoleLine[], from: number): ConsoleLine[] =>
+    lines.filter((line) => line.id > from && line.tone !== 'input' && line.text !== '');
+
+  const english = (line: ConsoleLine): string =>
+    line.message === undefined ? '' : render(ENGLISH.t, line.message);
+
+  it('come with every one-line answer to a control', async () => {
+    const h = await connected();
+    let checked = 0;
+    for (const line of CONTROL_LINES) {
+      const from = h.state().console.at(-1)?.id ?? 0;
+      await h.app.run(line);
+      await h.app.whenIdle();
+      // A refresh that goes well says nothing, and a diagnosis says several lines: neither is a toast.
+      const fresh = answers(h.state().console, from);
+      if (fresh.length !== 1) continue;
+      expect(fresh[0]?.message, `${line}: ${fresh[0]?.text}`).toBeDefined();
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(24);
+  });
+
+  it('say in English exactly what the line says', async () => {
+    const h = await connected();
+    for (const line of CONTROL_LINES) await h.app.run(line);
+    await h.app.whenIdle();
+    const keyed = h.state().console.filter((line) => line.message !== undefined);
+    expect(keyed.length).toBeGreaterThan(20);
+    for (const line of keyed) expect(line.text.replace(/^Error: /, '')).toBe(english(line));
+  });
+
+  it('come with the errors the app raises before there is a device', async () => {
+    const offline = harness(null);
+    await offline.app.run('connect');
+    const [failure] = answers(offline.state().console, 0);
+    expect(failure?.text).toMatch(/^Error: transport error: this browser has no Web Bluetooth/);
+    expect(english(failure as ConsoleLine)).toBe(failure?.text.replace(/^Error: /, ''));
+
+    const idle = harness();
+    await idle.app.run('battery');
+    const [refusal] = answers(idle.state().console, 0);
+    expect(refusal?.text).toBe('Not connected. Run connect, or demo to try a simulated device.');
+    expect(english(refusal as ConsoleLine)).toBe(refusal?.text);
+  });
+
+  it('come with a reading that failed, for the page to explain it', async () => {
+    const h = await connected();
+    h.bluetooth.device.silent = true;
+    await h.run('brightness');
+    const field = h.state().brightness;
+    expect(field.status).toBe('error');
+    if (field.status !== 'error') return;
+    expect(field.message).toBeDefined();
+    expect(field.message && render(ENGLISH.t, field.message)).toBe(field.error);
+  });
+
+  it('keep a device name that looks like a template as it is', async () => {
+    const h = harness();
+    h.bluetooth.options = { name: '{{x}} $t(page.lede)' };
+    await h.app.run('connect');
+    const greeting = h.state().console.find((line) => line.text.startsWith('Connected to'));
+    expect(greeting?.text).toContain('Connected to {{x}} $t(page.lede) (');
+    expect(english(greeting as ConsoleLine)).toBe(greeting?.text);
   });
 });

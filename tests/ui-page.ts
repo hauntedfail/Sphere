@@ -75,3 +75,10 @@ export async function connectedPage(options: PageOptions = {}): Promise<Page> {
   await page.run('demo');
   return page;
 }
+
+/** The same, connected the way a real device is, so the page offers to save it. */
+export async function bluetoothPage(options: PageOptions = {}): Promise<Page> {
+  const page = openPage(options);
+  await page.run('connect');
+  return page;
+}

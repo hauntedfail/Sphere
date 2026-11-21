@@ -1,6 +1,7 @@
 /** Device and settings panes: functions from state to DOM nodes. */
 import type { AppState, ConnectedDevice, Field } from '../app/state';
 import type { Translate } from '../i18n/i18n';
+import { render } from '../i18n/message';
 import type { MessageKey, Messages } from '../i18n/messages/en';
 import { formatFirmware } from '../protocol/identity';
 import { KNOWN_MODELS, type Capability, modelLabel, supports } from '../protocol/model';
@@ -118,7 +119,8 @@ function fieldValue<T>(field: Field<T>): T | undefined {
 /** Text for a field that is not ready, or `null` when it has a value to show. */
 function fieldPlaceholder<T>(t: Translate, field: Field<T>): Child {
   if (field.status === 'error') {
-    return h('span', { class: 'bad', attrs: { title: field.error } }, t('field.readFailed'));
+    const reason = field.message === undefined ? field.error : render(t, field.message);
+    return h('span', { class: 'bad', attrs: { title: reason } }, t('field.readFailed'));
   }
   if (fieldValue(field) !== undefined) return null;
   return h('span', { class: 'pending' }, t(field.status === 'loading' ? 'field.reading' : 'field.notRead'));

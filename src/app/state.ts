@@ -1,5 +1,6 @@
 import type { DeviceStatus } from '../device/iqos';
 import type { I18n } from '../i18n/i18n';
+import type { MessageRef } from '../i18n/message';
 import type { DeviceInfo } from '../protocol/gatt';
 import type { Diagnosis } from '../protocol/identity';
 import type { DeviceModel } from '../protocol/model';
@@ -14,7 +15,14 @@ export type Field<T> =
   | { readonly status: 'idle' }
   | { readonly status: 'loading'; readonly value?: T }
   | { readonly status: 'ready'; readonly value: T }
-  | { readonly status: 'error'; readonly error: string; readonly value?: T };
+  | {
+      readonly status: 'error';
+      /** What went wrong, in English. */
+      readonly error: string;
+      /** The same, for the page to say in its own language. */
+      readonly message?: MessageRef;
+      readonly value?: T;
+    };
 
 export const IDLE: Field<never> = { status: 'idle' };
 
@@ -36,7 +44,10 @@ export type ConsoleTone = 'input' | 'out' | 'error' | 'note';
 export interface ConsoleLine {
   readonly id: number;
   readonly tone: ConsoleTone;
+  /** The line as the console shows it, in English. */
   readonly text: string;
+  /** The same line for the page to say in its own language, where it has one. */
+  readonly message?: MessageRef;
 }
 
 export interface WireLine {
