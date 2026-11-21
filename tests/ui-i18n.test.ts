@@ -200,7 +200,7 @@ describe('the language switch', () => {
   });
 });
 
-describe.each(['ja'] as const)('the page in %s', (locale) => {
+describe.each(['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it'] as const)('the page in %s', (locale) => {
   /** English sentences: any message of two words or more. Names and single words can coincide. */
   const sentences = (messages: Messages): string[] =>
     [...new Set(collect(messages))].filter((text) => /\S\s+\S/.test(text.trim())).map((text) => text.trim());
@@ -224,10 +224,14 @@ describe.each(['ja'] as const)('the page in %s', (locale) => {
 
   it('leaves no English sentence on the page, before or after connecting', async () => {
     const page = await connectedPage({ i18n: await loadI18n(locale) });
+    // A message the language keeps as it is in English (a pair of names, say) is its own, not a leftover.
+    const own = new Set(collect(await loadMessages(locale)).map((text) => text.trim()));
+    const foreign = sentences(en).filter((sentence) => !own.has(sentence));
+    expect(foreign.length).toBeGreaterThan(100);
     const shown = (): string => squash(document.querySelector('.shell')?.textContent ?? '');
-    for (const sentence of sentences(en)) expect(shown(), sentence).not.toContain(sentence);
+    for (const sentence of foreign) expect(shown(), sentence).not.toContain(sentence);
     await page.run('disconnect');
-    for (const sentence of sentences(en)) expect(shown(), sentence).not.toContain(sentence);
+    for (const sentence of foreign) expect(shown(), sentence).not.toContain(sentence);
   });
 
   it('keeps the session log in English', async () => {

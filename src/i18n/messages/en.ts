@@ -50,7 +50,7 @@ export const en = {
       and: 'crate and',
       trademark: '. Not affiliated with Philip Morris International; IQOS is their trademark.',
       typefaces:
-        'Typefaces: Doto, Instrument Sans, Fusion Pixel and Noto Sans, under the SIL Open Font License 1.1.',
+        'Typefaces: Doto, Instrument Sans, Fusion Pixel, Noto Sans and Geist, under the SIL Open Font License 1.1.',
       licences: 'Font licences',
       drawings: ". The device drawings are Sphere's own.",
     },

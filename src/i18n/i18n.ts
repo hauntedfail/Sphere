@@ -43,11 +43,20 @@ export const ENGLISH: I18n = createI18n('en', en);
  */
 export async function loadMessages(locale: Locale): Promise<Messages> {
   switch (locale) {
+    case 'en':
+      return en;
     case 'ja':
       return (await import('./messages/ja')).ja;
-    default:
-      // The languages without a dictionary yet are known by name and read in English.
-      return en;
+    case 'zh-Hans':
+      return (await import('./messages/zh-Hans')).zhHans;
+    case 'zh-Hant':
+      return (await import('./messages/zh-Hant')).zhHant;
+    case 'ko':
+      return (await import('./messages/ko')).ko;
+    case 'ru':
+      return (await import('./messages/ru')).ru;
+    case 'it':
+      return (await import('./messages/it')).it;
   }
 }
 

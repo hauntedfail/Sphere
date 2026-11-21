@@ -181,11 +181,38 @@ const placeholders = (text: string): string[] =>
   [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((match) => match[1] ?? '').sort();
 
 /** The languages that have a dictionary of their own. */
-const TRANSLATED: readonly Locale[] = ['ja'];
+const TRANSLATED: readonly Locale[] = ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it'];
 
 /** Messages that are a name or a bare parameter, and so read the same as in English. */
+const FLEX_NAMES = [
+  'reading.flexbattery',
+  'reading.flexpuff',
+  'settings.flexBattery.title',
+  'settings.flexPuff.title',
+  'settings.missing.flexbattery',
+  'settings.missing.flexpuff',
+];
+/** `error.plain` is a bare parameter; `device.art` and the separator are punctuation alone. */
 const SAME_AS_ENGLISH: Readonly<Partial<Record<Locale, readonly string[]>>> = {
   ja: ['device.bluetooth', 'error.plain'],
+  // FlexPuff and FlexBattery keep their names where no local spelling was found.
+  'zh-Hans': ['error.plain', ...FLEX_NAMES],
+  'zh-Hant': ['error.plain', ...FLEX_NAMES],
+  ko: ['device.art', 'error.plain', 'settings.missing.separator'],
+  ru: ['device.art', 'device.bluetooth', 'error.plain', 'page.matrix.flex', 'settings.missing.separator', ...FLEX_NAMES],
+  // Italian also says "no", "holder", "Performance" and "Eco".
+  it: [
+    'device.art',
+    'device.bluetooth',
+    'device.rows.holder',
+    'error.plain',
+    'page.matrix.flex',
+    'page.matrix.no',
+    'settings.flexBattery.optionEco',
+    'settings.flexBattery.optionPerformance',
+    'settings.missing.separator',
+    ...FLEX_NAMES,
+  ],
 };
 
 describe.each(TRANSLATED)('the %s dictionary', (locale) => {

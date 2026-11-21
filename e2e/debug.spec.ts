@@ -186,3 +186,15 @@ test('changing the language keeps the device connected', async ({ page }) => {
   await expect(page.locator('#device-pane [data-key="disconnect"]')).toBeVisible();
   await expect(toasts(page)).toBeEmpty();
 });
+
+for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
+  test(`${locale}: the connected page fits the screen`, async ({ page }) => {
+    await page.goto(`/?lang=${locale}`);
+    await page.locator('#demo-button').click();
+    await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
+    await page.evaluate(() => document.fonts.ready);
+    await expectNoSidewaysScroll(page);
+    await page.locator('[data-key="details-summary"]').click();
+    await expectNoSidewaysScroll(page);
+  });
+}

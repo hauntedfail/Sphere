@@ -227,3 +227,17 @@ test('fetches the fonts of a language only when the page is in it', async ({ pag
   expect(japanese.some((name) => name.startsWith('text-ja')), japanese.join(' ')).toBe(true);
   await expectNoSidewaysScroll(page);
 });
+
+for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
+  test(`${locale}: the page is in that language and fits the screen`, async ({ page, baseURL }) => {
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await page.goto(`/?lang=${locale}`);
+    await expect(page.locator('html')).toHaveAttribute('lang', locale);
+    await expect(page.locator('#language')).toHaveValue(locale);
+    await expect(page.locator('#connect-button')).not.toHaveText('Connect a device');
+    await page.evaluate(() => document.fonts.ready);
+    for (const url of requests) expect(url.startsWith(baseURL ?? ''), url).toBe(true);
+    await expectNoSidewaysScroll(page);
+  });
+}

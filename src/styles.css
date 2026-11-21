@@ -56,6 +56,62 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Sphere Dots ZH-HANS';
+  src: url('./assets/fonts/dots-zh-hans.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text ZH-HANS';
+  src: url('./assets/fonts/text-zh-hans.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots ZH-HANT';
+  src: url('./assets/fonts/dots-zh-hant.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text ZH-HANT';
+  src: url('./assets/fonts/text-zh-hant.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots KO';
+  src: url('./assets/fonts/dots-ko.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text KO';
+  src: url('./assets/fonts/text-ko.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots RU';
+  src: url('./assets/fonts/dots-ru.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text RU';
+  src: url('./assets/fonts/text-ru.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
 :root {
   --void: #000000;
   --well: #0b0b0b;
@@ -75,6 +131,26 @@
 :root:lang(ja) {
   --dots: 'Doto', 'Sphere Dots JA', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
   --sans: 'Instrument Sans', 'Sphere Text JA', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(zh-Hans) {
+  --dots: 'Doto', 'Sphere Dots ZH-HANS', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text ZH-HANS', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(zh-Hant) {
+  --dots: 'Doto', 'Sphere Dots ZH-HANT', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text ZH-HANT', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(ko) {
+  --dots: 'Doto', 'Sphere Dots KO', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text KO', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(ru) {
+  --dots: 'Doto', 'Sphere Dots RU', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text RU', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 *,

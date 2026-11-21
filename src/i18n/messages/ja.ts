@@ -52,7 +52,7 @@ export const ja = {
       and: 'crate と',
       trademark: 'です。Philip Morris International とは無関係で、IQOS は同社の商標です。',
       typefaces:
-        '書体は Doto、Instrument Sans、Fusion Pixel、Noto Sans で、SIL Open Font License 1.1 で配布されています。',
+        '書体は Doto、Instrument Sans、Fusion Pixel、Noto Sans、Geist で、SIL Open Font License 1.1 で配布されています。',
       licences: 'フォントのライセンス',
       drawings: '。デバイスの絵は Sphere が描いたものです。',
     },

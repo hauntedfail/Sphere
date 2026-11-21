@@ -15,9 +15,9 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const FONTS = join(ROOT, 'src/assets/fonts');
 
 /** Languages written in what Doto and Instrument Sans already hold. */
-const LATIN_LOCALES: readonly Locale[] = ['en'];
+const LATIN_LOCALES: readonly Locale[] = ['en', 'it'];
 /** Languages that ship a dot font and a text font of their own. */
-const FONT_LOCALES: readonly Locale[] = ['ja'];
+const FONT_LOCALES: readonly Locale[] = ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru'];
 
 /** Characters above U+00FF that both Doto and Instrument Sans hold, as shipped. */
 const LATIN_COVERED: ReadonlySet<number> = new Set(
