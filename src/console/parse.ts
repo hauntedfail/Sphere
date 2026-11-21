@@ -3,6 +3,7 @@
  * prompt accepts, plus the few commands a page needs that a process does not
  * (`connect`, `demo`, `disconnect`, `model`, `refresh`, `clear`).
  */
+import { LOCALES, type Locale, parseLocale } from '../i18n/locales';
 import { usageError } from '../protocol/errors';
 import { type DeviceModel, parseModelSelector } from '../protocol/model';
 import { type BrightnessLevel, type FlexBatteryMode, parseBrightnessLevel } from '../protocol/settings';
@@ -24,6 +25,7 @@ export type Command =
   | { readonly name: 'device'; readonly action: DeviceAction }
   | { readonly name: 'connect'; readonly target: ConnectTarget }
   | { readonly name: 'demo'; readonly model?: DeviceModel }
+  | { readonly name: 'lang'; readonly locale?: Locale }
   | { readonly name: 'model'; readonly model: DeviceModel };
 
 /** Which device `connect` should open. */
@@ -63,6 +65,7 @@ export const COMMAND_NAMES: readonly string[] = [
   'flexpuff',
   'help',
   'info',
+  'lang',
   'lock',
   'model',
   'quit',
@@ -121,6 +124,8 @@ export function parseCommand(line: string): Command | null {
       return parseDemo(rest);
     case 'model':
       return parseModel(rest);
+    case 'lang':
+      return parseLanguage(rest);
     default:
       throw usageError(`Unknown command: ${first}`);
   }
@@ -269,6 +274,15 @@ function parseDemo(args: readonly string[]): Command {
   if (extra.length > 0) throw usageError('Usage: demo [model]');
   if (selector === undefined) return { name: 'demo' };
   return { name: 'demo', model: requireModel(selector) };
+}
+
+/** `lang` asks which language the page is in; `lang <code>` chooses one. */
+function parseLanguage(args: readonly string[]): Command {
+  const [code, ...extra] = args;
+  if (code === undefined) return { name: 'lang' };
+  const locale = parseLocale(code);
+  if (locale === null || extra.length > 0) throw usageError(`Usage: lang [${LOCALES.join('|')}]`);
+  return { name: 'lang', locale };
 }
 
 function parseModel(args: readonly string[]): Command {

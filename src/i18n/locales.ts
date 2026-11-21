@@ -7,6 +7,8 @@ export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = 'en';
 export const LOCALE_STORAGE_KEY = 'sphere.locale.v1';
+/** The parameter of the address that opens the page in a language: `?lang=ja`. */
+export const LOCALE_PARAMETER = 'lang';
 
 /** Each language under its own name, for the switch. */
 export const LOCALE_NAMES: Readonly<Record<Locale, string>> = {
@@ -62,4 +64,14 @@ export function resolveLocale(input: LocaleInput): Locale {
     if (match !== null) return match;
   }
   return DEFAULT_LOCALE;
+}
+
+/**
+ * `href` without its `lang` parameter. Once a visitor has chosen a language
+ * on the page, the address must stop asking for another one.
+ */
+export function withoutLanguageParameter(href: string): string {
+  const url = new URL(href);
+  url.searchParams.delete(LOCALE_PARAMETER);
+  return url.href;
 }

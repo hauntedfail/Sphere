@@ -42,6 +42,8 @@ export async function runCommand(app: App, command: Command): Promise<void> {
       return;
     case 'model':
       return app.setModel(command.model);
+    case 'lang':
+      return command.locale === undefined ? app.sayLanguage() : app.setLocale(command.locale);
     case 'device':
       return device(app, command.action);
     case 'refresh':

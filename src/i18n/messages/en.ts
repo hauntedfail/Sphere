@@ -55,6 +55,7 @@ export const en = {
     },
   },
   bar: {
+    language: 'Language',
     notConnected: 'not connected',
     simulated: 'simulated {{model}}',
     state: {
@@ -250,6 +251,7 @@ export const en = {
     flexbatteryUpdated: 'FlexBattery settings updated',
     labelSaved: 'Saved device label: {{label}}',
     labelRemoved: 'Removed device label: {{label}}',
+    language: 'Language: {{name}}',
   },
   /** Values that appear inside an answer. */
   value: {
@@ -288,6 +290,7 @@ export const en = {
     couldNotConnect:
       'could not connect ({{detail}}). Wake the device, keep it close, and close the IQOS app if it is connected.',
     simulatorMissing: 'The simulated device is only part of debug builds.',
+    languageUnavailable: 'could not load {{name}}. The page stays as it is.',
     simulatedNotSaved: 'The simulated device cannot be saved.',
     identifiesAs: 'This device identifies itself as {{model}}.',
     labelNotFound: 'Device label not found: {{label}}',

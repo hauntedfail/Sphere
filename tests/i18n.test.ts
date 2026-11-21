@@ -4,7 +4,7 @@ import { parseCommand } from '../src/console/parse';
 import { SphereError, describeError, usageError } from '../src/protocol/errors';
 import { EMPTY_BOOK, normalizeLabel, validateLabel, withDevice } from '../src/storage/devices';
 import { ENGLISH, bootI18n, createI18n } from '../src/i18n/i18n';
-import { resolveLocale } from '../src/i18n/locales';
+import { resolveLocale, withoutLanguageParameter } from '../src/i18n/locales';
 import { render } from '../src/i18n/message';
 import { type Messages, en } from '../src/i18n/messages/en';
 
@@ -151,5 +151,18 @@ describe('an error as a message', () => {
     const error = thrown as SphereError;
     expect(error.ref).toBeDefined();
     expect(render(ENGLISH.t, errorRef(error))).toBe(error.message);
+  });
+});
+
+describe('withoutLanguageParameter', () => {
+  it('takes ?lang= off an address and leaves the rest', () => {
+    expect(withoutLanguageParameter('https://sphere.test/?a=1&lang=ja#x')).toBe('https://sphere.test/?a=1#x');
+    expect(withoutLanguageParameter('https://sphere.test/?lang=ja')).toBe('https://sphere.test/');
+    expect(withoutLanguageParameter('https://sphere.test/dir/?lang=ko&b=2')).toBe('https://sphere.test/dir/?b=2');
+  });
+
+  it('returns an address without one unchanged', () => {
+    expect(withoutLanguageParameter('https://sphere.test/?a=1#x')).toBe('https://sphere.test/?a=1#x');
+    expect(withoutLanguageParameter('http://127.0.0.1:4173/')).toBe('http://127.0.0.1:4173/');
   });
 });

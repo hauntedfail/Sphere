@@ -175,3 +175,14 @@ test('keeps the simulator when the browser has no Web Bluetooth', async ({ page 
   await page.getByRole('button', { name: 'Try a simulated device' }).click();
   await expect(page.locator('#title-state')).toHaveText('ready');
 });
+
+test('changing the language keeps the device connected', async ({ page }) => {
+  await connectSimulator(page);
+  const level = await page.locator('#battery-level').textContent();
+  await page.locator('#language').selectOption('ja');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('#battery-level')).toHaveText(level ?? '');
+  await expect(page.locator('#device-pane [data-key="disconnect"]')).toBeVisible();
+  await expect(toasts(page)).toBeEmpty();
+});

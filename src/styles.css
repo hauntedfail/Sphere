@@ -163,6 +163,29 @@ main:focus {
 
 /* ── Shell and top bar ──────────────────────────────────────────────────── */
 
+/*
+ * index.html is written in English. Until the script has drawn the page in
+ * the visitor's language (and removed `data-boot`), the English is kept out
+ * of sight, so that nobody watches one language turn into another.
+ *
+ * Without scripting nothing would ever uncover the page, so the rule applies
+ * only where scripts run. If the script fails to load, the page shows itself
+ * after a moment anyway. That is a safeguard, not motion, so it is kept when
+ * motion is turned down.
+ */
+@media (scripting: enabled) {
+  html[data-boot] .shell {
+    visibility: hidden;
+    animation: boot-reveal 0s linear 4s forwards !important;
+  }
+}
+
+@keyframes boot-reveal {
+  to {
+    visibility: visible;
+  }
+}
+
 .shell {
   max-width: 1180px;
   margin: 0 auto;
@@ -240,6 +263,27 @@ main:focus {
   color: var(--mute);
   font-size: 13px;
   white-space: nowrap;
+}
+
+/*
+ * The language switch. Set in the system's own face: it lists every language
+ * under its own name, and no one language's font holds them all.
+ */
+.language {
+  flex: none;
+  height: 28px;
+  max-width: 9.5em;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--void);
+  color: var(--mute);
+  font: 400 13px / 1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.language:hover,
+.language:focus-visible {
+  border-color: var(--ink);
+  color: var(--ink);
 }
 
 .pill::before {
@@ -1209,6 +1253,10 @@ button.model-tile:hover {
 @media (max-width: 559px) {
   .bar-device {
     display: none;
+  }
+
+  .language {
+    max-width: 7em;
   }
 
   .device-hero {

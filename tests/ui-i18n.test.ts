@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { LOCALES, LOCALE_NAMES, type Locale } from '../src/i18n/locales';
 import { type Messages, en } from '../src/i18n/messages/en';
 import { applyStaticText } from '../src/ui/static';
 import type { I18n } from '../src/i18n/i18n';
@@ -109,5 +110,91 @@ describe('what a control answers', () => {
     page.buttonByKey('lock').click();
     await page.settle();
     expect(page.text('toasts')).toBe('Device locked');
+  });
+});
+
+describe('the language switch', () => {
+  /** Every language is the mirror, under its own name. */
+  const loadMirror = async (locale: Locale): Promise<I18n> => ({ locale, t: mirror.t });
+  const select = (): HTMLSelectElement => document.getElementById('language') as HTMLSelectElement;
+
+  async function choose(locale: Locale): Promise<void> {
+    select().value = locale;
+    select().dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(select().dataset['busy']).toBeUndefined());
+  }
+
+  it('offers every language under its own name, with the one in use chosen', () => {
+    openPage();
+    expect([...select().options].map((option) => option.value)).toEqual([...LOCALES]);
+    expect([...select().options].map((option) => option.textContent)).toEqual(LOCALES.map((l) => LOCALE_NAMES[l]));
+    expect(select().value).toBe('en');
+    expect(document.documentElement.lang).toBe('en');
+  });
+
+  it('opens in the language the app was given', () => {
+    openPage({ i18n: mirror });
+    expect(select().value).toBe('ja');
+    expect(document.documentElement.lang).toBe('ja');
+    expect(select().getAttribute('aria-label')).toBe('⟦bar.language⟧');
+  });
+
+  it('redraws everything and sets the language of the document', async () => {
+    const page = openPage({ loadI18n: loadMirror });
+    await choose('ja');
+    expect(page.app.store.get().i18n.locale).toBe('ja');
+    expect(document.documentElement.lang).toBe('ja');
+    expect(page.text('title-state')).toBe('⟦bar.state.idle⟧');
+    expect(page.text('title-device')).toBe('⟦bar.notConnected⟧');
+    expect(page.text('connect-button')).toBe('⟦page.connect⟧');
+    expect(page.text('demo-button')).toBe('⟦page.demo⟧');
+    expect(document.querySelector('.lede')?.textContent).toBe('⟦page.lede⟧');
+    expect(select().value).toBe('ja');
+  });
+
+  it('stays connected and keeps what was read', async () => {
+    const page = await connectedPage({ loadI18n: loadMirror });
+    const level = page.text('battery-level');
+    expect(level).toMatch(/^\d+%$/);
+    await choose('ko');
+    expect(page.app.store.get().phase).toBe('connected');
+    expect(page.text('battery-level')).toBe(level);
+    expect(page.buttonByKey('refresh').textContent).toBe('⟦device.refresh⟧');
+    expect(document.querySelector('.feature-title .dot-text')?.textContent).toMatch(/^⟦settings\./);
+  });
+
+  it('keeps a label that is being typed', async () => {
+    await bluetoothPage({ loadI18n: loadMirror });
+    (document.getElementById('save-label') as HTMLInputElement).value = 'desk';
+    await choose('ru');
+    expect((document.getElementById('save-label') as HTMLInputElement).value).toBe('desk');
+  });
+
+  it('switches without a toast and without making a control wait', async () => {
+    const page = await connectedPage({ loadI18n: loadMirror });
+    await choose('it');
+    expect(page.text('toasts')).toBe('');
+    expect(document.querySelectorAll('.is-waiting').length).toBe(0);
+  });
+
+  it('follows a language chosen any other way', async () => {
+    const page = openPage({ loadI18n: loadMirror });
+    await page.run('lang zh-Hant');
+    expect(select().value).toBe('zh-Hant');
+    expect(document.documentElement.lang).toBe('zh-Hant');
+  });
+
+  it('goes back to the language in use, and says why, when another cannot be loaded', async () => {
+    const page = openPage({ loadI18n: () => Promise.reject(new Error('offline')) });
+    await choose('ja');
+    expect(select().value).toBe('en');
+    expect(document.documentElement.lang).toBe('en');
+    expect(page.text('toasts')).toBe('transport error: could not load 日本語. The page stays as it is.');
+  });
+
+  it('uncovers the page once it is drawn', () => {
+    document.documentElement.setAttribute('data-boot', '');
+    openPage();
+    expect(document.documentElement.hasAttribute('data-boot')).toBe(false);
   });
 });

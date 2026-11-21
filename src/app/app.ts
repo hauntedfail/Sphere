@@ -8,8 +8,8 @@
  */
 import { parseCommand, type ConnectTarget } from '../console/parse';
 import { Iqos } from '../device/iqos';
-import { ENGLISH, type I18n } from '../i18n/i18n';
-import type { Locale } from '../i18n/locales';
+import { ENGLISH, type I18n, loadI18n } from '../i18n/i18n';
+import { LOCALE_NAMES, LOCALE_STORAGE_KEY, type Locale } from '../i18n/locales';
 import type { MessageRef } from '../i18n/message';
 import { SphereError, describeError } from '../protocol/errors';
 import { type DeviceModel, modelFromLocalName, modelLabel } from '../protocol/model';
@@ -74,6 +74,8 @@ const MAX_WIRE_LINES = 400;
 
 /** Lines that end the connection. They run at once instead of queueing. */
 const HANG_UP = /^\s*(disconnect|exit|quit)\s*$/i;
+/** Choosing a language asks nothing of the device, so it does not wait for it either. */
+const LANGUAGE = /^\s*lang(\s|$)/i;
 
 export class App {
   readonly store: Store<AppState>;
@@ -88,6 +90,9 @@ export class App {
   /** Bumped on every connect and disconnect so late results are dropped. */
   private generation = 0;
   private readonly now: () => number;
+
+  /** Counts the choices of language, so a slow one cannot overtake a later one. */
+  private localeRequest = 0;
 
   constructor(private readonly deps: AppDeps) {
     this.version = deps.version;
@@ -105,6 +110,7 @@ export class App {
    */
   run(line: string): Promise<void> {
     if (HANG_UP.test(line)) return this.hangUp(line);
+    if (LANGUAGE.test(line)) return this.aside(line);
     this.patch((state) => ({ ...state, busy: state.busy + 1 }));
     const task = this.queue.then(() => this.execute(line));
     this.queue = task;
@@ -258,6 +264,52 @@ export class App {
     this.patch((state) => ({ ...state, ...NO_DEVICE_FIELDS, device: { ...device, model } }));
     this.say({ key: 'result.treatingAs', params: { model: modelLabel(model) } });
     await refreshDevice(this);
+  }
+
+  /**
+   * Run a line beside the queue: it is not counted as work in progress, and
+   * it does not stand in for the Enter that stops Find My IQOS.
+   */
+  private async aside(line: string): Promise<void> {
+    this.print(`iqos> ${line}`, 'input');
+    try {
+      const command = parseCommand(line);
+      if (command !== null) await runCommand(this, command);
+    } catch (error) {
+      this.fail(error);
+    }
+  }
+
+  sayLanguage(): void {
+    this.say({ key: 'result.language', params: { name: LOCALE_NAMES[this.store.get().i18n.locale] } });
+  }
+
+  /**
+   * Put the page into `locale` and remember the choice. If a later choice is
+   * made while this one is still loading, the later one wins and this one
+   * ends without a word.
+   */
+  async setLocale(locale: Locale): Promise<void> {
+    const request = ++this.localeRequest;
+    let i18n: I18n;
+    try {
+      i18n = await (this.deps.loadI18n ?? loadI18n)(locale);
+    } catch (error) {
+      if (request !== this.localeRequest) return;
+      throw appError(
+        'transport',
+        { key: 'error.languageUnavailable', params: { name: LOCALE_NAMES[locale] } },
+        error,
+      );
+    }
+    if (request !== this.localeRequest) return;
+    this.patch((state) => ({ ...state, i18n }));
+    try {
+      this.deps.storage.setItem(LOCALE_STORAGE_KEY, locale);
+    } catch {
+      this.say({ key: 'result.storageFailed' }, 'note');
+    }
+    this.sayLanguage();
   }
 
   private async hangUp(line: string): Promise<void> {

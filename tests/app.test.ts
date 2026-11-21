@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/app';
 import type { AppState, ConsoleLine } from '../src/app/state';
-import { ENGLISH } from '../src/i18n/i18n';
+import { ENGLISH, type I18n } from '../src/i18n/i18n';
+import { LOCALE_STORAGE_KEY, type Locale } from '../src/i18n/locales';
 import { render } from '../src/i18n/message';
 import { KNOWN_MODELS, modelFromLocalName } from '../src/protocol/model';
 import { STORAGE_KEY, type KeyValueStore } from '../src/storage/devices';
@@ -734,5 +735,124 @@ describe('messages the page can translate', () => {
     const greeting = h.state().console.find((line) => line.text.startsWith('Connected to'));
     expect(greeting?.text).toContain('Connected to {{x}} $t(page.lede) (');
     expect(english(greeting as ConsoleLine)).toBe(greeting?.text);
+  });
+});
+
+describe('choosing a language', () => {
+  /** Another language, as far as the app can tell: English words under another name. */
+  const speak = (locale: Locale): I18n => ({ ...ENGLISH, locale });
+  const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function speaking(load: (locale: Locale) => Promise<I18n> = async (locale) => speak(locale)) {
+    const storage = new MemoryStore();
+    const bluetooth = new FakeBluetooth();
+    const app = new App({
+      storage,
+      bluetooth,
+      version: '9.9.9',
+      simulator: createSimulator({ latencyMs: 0 }),
+      now: () => 1000,
+      loadI18n: load,
+    });
+    const locale = (): Locale => app.store.get().i18n.locale;
+    const printed = (): string[] => app.store.get().console.map((line) => line.text);
+    return { app, storage, bluetooth, locale, printed };
+  }
+
+  it('starts in the language it was given, English otherwise', () => {
+    expect(speaking().locale()).toBe('en');
+    const app = new App({ storage: new MemoryStore(), bluetooth: null, version: '1', i18n: speak('ko') });
+    expect(app.store.get().i18n.locale).toBe('ko');
+  });
+
+  it('switches, says so, and saves the choice', async () => {
+    const h = speaking();
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.printed()).toEqual(['iqos> lang ja', 'Language: 日本語']);
+    expect(h.storage.data.get(LOCALE_STORAGE_KEY)).toBe('ja');
+  });
+
+  it('answers a bare lang with the language in use', async () => {
+    const h = speaking();
+    await h.app.run('lang');
+    expect(h.printed()).toEqual(['iqos> lang', 'Language: English']);
+    expect(h.storage.data.has(LOCALE_STORAGE_KEY)).toBe(false);
+  });
+
+  it('refuses a code it does not know and stays as it was', async () => {
+    const h = speaking();
+    await h.app.run('lang xx');
+    expect(h.locale()).toBe('en');
+    expect(h.printed().at(-1)).toBe('Usage: lang [en|ja|zh-Hans|zh-Hant|ko|ru|it]');
+  });
+
+  it('does not count as busy, so no control waits on it', async () => {
+    const h = speaking();
+    const switching = h.app.run('lang ja');
+    expect(h.app.store.get().busy).toBe(0);
+    await switching;
+    expect(h.app.store.get().busy).toBe(0);
+  });
+
+  it('switches at once, ahead of a queue that is waiting on the device', async () => {
+    const h = speaking();
+    h.bluetooth.options = { latencyMs: 40 };
+    await h.app.run('connect');
+    void h.app.run('battery');
+    void h.app.run('battery');
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.app.store.get().busy).toBeGreaterThan(0);
+    await h.app.whenIdle();
+  });
+
+  it('does not stop Find my IQOS', async () => {
+    const h = speaking();
+    await h.app.run('connect');
+    await h.app.run('findmyiqos');
+    expect(h.app.store.get().finding).toBe(true);
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.app.store.get().finding).toBe(true);
+    await h.app.run('');
+  });
+
+  it('keeps the language, and says why, when the dictionary cannot be loaded', async () => {
+    const h = speaking(() => Promise.reject(new Error('offline')));
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('en');
+    const failure = h.app.store.get().console.at(-1);
+    expect(failure?.tone).toBe('error');
+    expect(failure?.text).toBe('Error: transport error: could not load 日本語. The page stays as it is.');
+    expect(failure?.message).toBeDefined();
+    expect(h.storage.data.has(LOCALE_STORAGE_KEY)).toBe(false);
+  });
+
+  it('ends on the last language chosen, however long an earlier one takes to load', async () => {
+    const h = speaking(async (locale) => {
+      if (locale === 'ja') await pause(30);
+      return speak(locale);
+    });
+    const slow = h.app.run('lang ja');
+    const quick = h.app.run('lang ko');
+    await Promise.all([slow, quick]);
+    expect(h.locale()).toBe('ko');
+    expect(h.storage.data.get(LOCALE_STORAGE_KEY)).toBe('ko');
+    expect(h.printed().filter((line) => line.startsWith('Language:'))).toEqual(['Language: 한국어']);
+  });
+
+  it('switches even when the browser refuses to store the choice', async () => {
+    const h = speaking();
+    h.storage.failing = true;
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.printed()).toContain('Could not write to browser storage; the change lasts until this tab closes.');
+  });
+
+  it('lists lang in help', async () => {
+    const h = speaking();
+    await h.app.run('help');
+    expect(h.printed().join('\n')).toMatch(/^ {2}lang \[code\]\s+Choose the language of the page$/m);
   });
 });

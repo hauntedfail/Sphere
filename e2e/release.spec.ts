@@ -132,3 +132,54 @@ test('serves the picture that link previews show', async ({ page }) => {
   expect(response.ok()).toBe(true);
   expect(response.headers()['content-type']).toBe('image/png');
 });
+
+test('a visitor can choose a language and find it again', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await page.locator('#language').selectOption('ja');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('#language')).toHaveValue('ja');
+});
+
+test('?lang= opens the page in that language without saving it', async ({ page }) => {
+  await page.goto('/?lang=ko');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
+  await expect(page.locator('#language')).toHaveValue('ko');
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('a choice made on the page outlives the ?lang= it was opened with', async ({ page }) => {
+  await page.goto('/?lang=ko');
+  await page.locator('#language').selectOption('it');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'it');
+  expect(new URL(page.url()).search).toBe('');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'it');
+});
+
+test('the page is covered until it is drawn, then shown', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('main[data-mounted]')).toBeVisible();
+  await expect(page.locator('html')).not.toHaveAttribute('data-boot');
+  await expect(page.locator('.lede')).toBeVisible();
+});
+
+test('the page can be read without JavaScript', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, ...(baseURL ? { baseURL } : {}) });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('.lede')).toBeVisible();
+  await context.close();
+});
+
+test('the page shows itself even if its script never runs', async ({ page, problems }) => {
+  await page.route('**/*.js', (route) => route.abort());
+  await page.goto('/');
+  await expect(page.locator('.lede')).toBeHidden();
+  await expect(page.locator('.lede')).toBeVisible({ timeout: 8000 });
+  // The browser reports the script it was refused; that is this test's own doing.
+  problems.length = 0;
+});

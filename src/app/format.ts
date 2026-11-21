@@ -128,6 +128,7 @@ export function helpLines(model: DeviceModel | null, simulator: boolean): string
     '  info                           Device metadata, firmware, and voltage snapshot',
     '  refresh                        Read every setting again',
     '  model <model>                  Choose the model when the name is not recognised',
+    '  lang [code]                    Choose the language of the page',
     '  clear                          Clear this console',
     '  help                           This help',
     '  quit | exit                    Disconnect',

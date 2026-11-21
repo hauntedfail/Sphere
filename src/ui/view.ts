@@ -6,6 +6,7 @@ import { render } from '../i18n/message';
 import type { MessageKey } from '../i18n/messages/en';
 import { modelLabel } from '../protocol/model';
 import { byId, h, redraw } from './dom';
+import { bindLanguage, dropLanguageParameter } from './language';
 import { createStage } from './dots';
 import { sessionLog } from './log';
 import {
@@ -90,6 +91,7 @@ export function mount(app: App): void {
   const saveContainer = byId('save-pane');
   const settingsContainer = byId('settings-pane');
   const toasts = byId('toasts');
+  const languageSelect = byId('language', HTMLSelectElement);
 
   byId('version').textContent = app.version;
 
@@ -134,6 +136,12 @@ export function mount(app: App): void {
     }, TOAST_MS);
   };
 
+  /** A line that carries a message is said in the page's language; any other is shown as printed. */
+  const said = (line: ConsoleLine): string =>
+    line.message === undefined
+      ? line.text.replace(/^Error: /, '')
+      : render(app.store.get().i18n.t, line.message);
+
   const report = (lines: readonly ConsoleLine[]): void => {
     const from = reportFrom;
     reportFrom = null;
@@ -141,10 +149,6 @@ export function mount(app: App): void {
     const fresh = lines.filter((line) => line.id > from && line.tone !== 'input' && line.text !== '');
     const failure = fresh.find((line) => line.tone === 'error');
     const [only] = fresh;
-    // A line that carries a message is said in the page's language; any other is shown as printed.
-    const { t } = app.store.get().i18n;
-    const said = (line: ConsoleLine): string =>
-      line.message === undefined ? line.text.replace(/^Error: /, '') : render(t, line.message);
     if (failure !== undefined) toast(said(failure), 'error');
     else if (fresh.length === 1 && only !== undefined) toast(said(only), 'out');
   };
@@ -172,6 +176,18 @@ export function mount(app: App): void {
   };
 
   // ── Controls that are always on the page ──────────────────────────────────
+
+  // Choosing a language does not queue, so nothing waits on it and a choice
+  // that works needs no toast: the page itself is the answer. One that fails
+  // leaves the page as it was, and that has to be said.
+  bindLanguage(languageSelect, async (locale) => {
+    const newest = app.store.get().console.at(-1)?.id ?? 0;
+    await app.run(`lang ${locale}`);
+    const state = app.store.get();
+    languageSelect.value = state.i18n.locale;
+    const failure = state.console.find((line) => line.id > newest && line.tone === 'error');
+    if (failure !== undefined) toast(said(failure), 'error');
+  });
 
   connectButton.addEventListener('click', () => run('connect'));
   connectAllButton.addEventListener('click', () => run('connect --all'));
@@ -201,6 +217,10 @@ export function mount(app: App): void {
     // First, because it also resets the few elements that the blocks below
     // then write over with the state of the moment.
     if (changed(state, previous, ['i18n'])) {
+      document.documentElement.lang = state.i18n.locale;
+      languageSelect.value = state.i18n.locale;
+      // Only after a choice made here: the address that opened the page keeps its `?lang=`.
+      if (previous !== null) dropLanguageParameter();
       applyStaticText(document, t);
       redraw(tiles, modelTiles(stage, app.canSimulate ? run : null, t));
     }
@@ -251,7 +271,11 @@ export function mount(app: App): void {
     // mid-keystroke does not rebuild the field the user is typing in.
     if (changed(state, previous, ['device', 'i18n'])) {
       const device = state.device;
+      // A change of language redraws the form too; what was being typed into it stays.
+      const typed = previous?.device === device ? document.querySelector<HTMLInputElement>('#save-label')?.value : undefined;
       redraw(saveContainer, device?.kind === 'ble' ? [saveForm(device, run, t)] : []);
+      const field = document.querySelector<HTMLInputElement>('#save-label');
+      if (field !== null && typed !== undefined) field.value = typed;
     }
     if (changed(state, previous, DEVICE_KEYS)) {
       redraw(deviceContainer, devicePane(state, run, ui));
@@ -269,4 +293,6 @@ export function mount(app: App): void {
   app.store.subscribe(draw);
   draw(app.store.get(), null);
   main.dataset['mounted'] = '';
+  // The page is in the visitor's language now: uncover it (see `data-boot` in the stylesheet).
+  document.documentElement.removeAttribute('data-boot');
 }
