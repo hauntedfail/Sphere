@@ -66,10 +66,20 @@ describe('the source', () => {
 });
 
 describe('what ships', () => {
-  it("is this repository's code: no runtime dependencies", () => {
+  it("is this repository's code, plus the one library it names", () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as Record<string, unknown>;
-    for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+    expect(Object.keys((manifest['dependencies'] as object | undefined) ?? {})).toEqual(['i18next']);
+    for (const field of ['optionalDependencies', 'peerDependencies']) {
       expect(Object.keys((manifest[field] as object | undefined) ?? {}), field).toEqual([]);
     }
+  });
+
+  it('gets nothing else along with that library', () => {
+    // The lockfile's own record of what i18next installs: its entries under `snapshots:`.
+    const lock = readFileSync(join(ROOT, 'pnpm-lock.yaml'), 'utf8');
+    const snapshots = lock.slice(lock.indexOf('\nsnapshots:\n'));
+    const entries = snapshots.split(/\n(?=  \S)/).filter((entry) => /^\s*'?i18next@/.test(entry));
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) expect(entry).not.toMatch(/^\s+dependencies:/m);
   });
 });
