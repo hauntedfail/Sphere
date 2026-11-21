@@ -49,7 +49,8 @@ export const en = {
       software: 'Sphere is free software under GPL-3.0, built on the',
       and: 'crate and',
       trademark: '. Not affiliated with Philip Morris International; IQOS is their trademark.',
-      typefaces: 'Typefaces: Doto and Instrument Sans, under the SIL Open Font License 1.1.',
+      typefaces:
+        'Typefaces: Doto, Instrument Sans, Fusion Pixel and Noto Sans, under the SIL Open Font License 1.1.',
       licences: 'Font licences',
       drawings: ". The device drawings are Sphere's own.",
     },

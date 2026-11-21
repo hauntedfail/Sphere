@@ -43,6 +43,8 @@ More on each: [Privacy and security](../README.md#privacy-and-security),
   establish, and what they do not.
 - [Agent harness](agent-harness.md): how the repository keeps agents on those
   rails, the kinds of evidence, and how the harness is changed.
+- [Fonts](fonts.md): the faces made for each language, and how to rebuild them
+  when a translation changes.
 
 ## Work
 

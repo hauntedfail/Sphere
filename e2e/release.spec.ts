@@ -204,3 +204,26 @@ test('fetches a dictionary only for the language it is shown in', async ({ page 
   await expect(page.locator('.lede')).toContainText('IQOS ILUMA を設定できます');
   await expect(page.locator('#connect-button')).toHaveText('デバイスを接続');
 });
+
+test('fetches the fonts of a language only when the page is in it', async ({ page }) => {
+  const fonts = async (path: string): Promise<string[]> => {
+    const seen: string[] = [];
+    const listen = (request: { url(): string; resourceType(): string }): void => {
+      if (request.resourceType() === 'font') seen.push(new URL(request.url()).pathname.split('/').pop() ?? '');
+    };
+    page.on('request', listen);
+    await page.goto(path);
+    await expect(page.locator('main[data-mounted]')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    page.off('request', listen);
+    return seen;
+  };
+
+  const english = await fonts('/');
+  expect(english.some((name) => /^(dots|text)-/.test(name)), english.join(' ')).toBe(false);
+
+  const japanese = await fonts('/?lang=ja');
+  expect(japanese.some((name) => name.startsWith('dots-ja')), japanese.join(' ')).toBe(true);
+  expect(japanese.some((name) => name.startsWith('text-ja')), japanese.join(' ')).toBe(true);
+  await expectNoSidewaysScroll(page);
+});

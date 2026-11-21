@@ -1,0 +1,20 @@
+{
+  "sources": {
+    "fusion-pixel-12": {
+      "url": "https://github.com/TakWolf/fusion-pixel-font/releases/download/2026.11.10/fusion-pixel-font-12px-proportional-otf.woff2-v2026.11.10.zip",
+      "sha256": "4a0bab32ebb6ca0525f87024f3adbacf409a74b0fc8373d5345c93b1b7cbb075",
+      "file": "fusion-pixel-12.zip"
+    },
+    "noto-sans-jp": {
+      "url": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
+      "sha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+      "file": "NotoSansJP.ttf"
+    }
+  },
+  "locales": {
+    "ja": {
+      "dots": { "source": "fusion-pixel-12", "member": "fusion-pixel-12px-proportional-ja.otf.woff2" },
+      "text": { "source": "noto-sans-jp" }
+    }
+  }
+}

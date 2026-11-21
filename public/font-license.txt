@@ -7,7 +7,25 @@ Fonts shipped with Sphere, and their licence
 2. Instrument Sans
    Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)
 
-Both are licensed under the SIL Open Font License 1.1, reproduced below.
+3. Sphere Dots (JA)
+   Made for Sphere from Fusion Pixel 12px: each character keeps only the
+   pixels the page needs and has every pixel redrawn as a round dot.
+   Fusion Pixel: Copyright (c) 2022, TakWolf (https://takwolf.com).
+   Fusion Pixel is itself put together from:
+     Ark Pixel   Copyright (c) 2021, TakWolf (https://takwolf.com).
+     Cubic 11    Copyright(c) 2005 M+ FONTS PROJECT
+                 Copyright (C) 2002-2004 COZ
+     Galmuri     Copyright (c) 2019-2025 Lee Minseo (quiple@quiple.dev)
+
+4. Sphere Text (JA)
+   Made for Sphere from Noto Sans JP: only the characters the page needs,
+   and only the weights from 400 to 600.
+   Noto Sans JP: (c) 2014-2021 Adobe (http://www.adobe.com/), with Reserved
+   Font Name 'Source'.
+
+All are licensed under the SIL Open Font License 1.1, reproduced below. The
+fonts made for Sphere are Modified Versions in that licence's terms: they are
+distributed under the same licence and carry names of their own.
 
 =======================================================================
 
