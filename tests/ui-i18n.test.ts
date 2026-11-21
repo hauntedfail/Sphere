@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { LOCALES, LOCALE_NAMES, type Locale } from '../src/i18n/locales';
 import { type Messages, en } from '../src/i18n/messages/en';
 import { applyStaticText } from '../src/ui/static';
-import type { I18n } from '../src/i18n/i18n';
+import { type I18n, loadI18n, loadMessages } from '../src/i18n/i18n';
+import { sessionLog } from '../src/ui/log';
 import { BODY, bluetoothPage, connectedPage, openPage } from './ui-page';
 
 const keyed = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[data-i18n]')];
@@ -196,5 +197,54 @@ describe('the language switch', () => {
     document.documentElement.setAttribute('data-boot', '');
     openPage();
     expect(document.documentElement.hasAttribute('data-boot')).toBe(false);
+  });
+});
+
+describe.each(['ja'] as const)('the page in %s', (locale) => {
+  /** English sentences: any message of two words or more. Names and single words can coincide. */
+  const sentences = (messages: Messages): string[] =>
+    [...new Set(collect(messages))].filter((text) => /\S\s+\S/.test(text.trim())).map((text) => text.trim());
+
+  function collect(node: unknown): string[] {
+    return Object.values(node as Record<string, unknown>).flatMap((value) =>
+      typeof value === 'string' ? [value] : collect(value),
+    );
+  }
+
+  it('fills every keyed element from its own dictionary', async () => {
+    openPage({ i18n: await loadI18n(locale) });
+    const own = await loadMessages(locale);
+    expect(document.documentElement.lang).toBe(locale);
+    for (const element of keyed()) {
+      const key = element.dataset['i18n'] ?? '';
+      if (element.id === 'title-device' || element.id === 'title-state' || element.id === 'connect-button') continue;
+      expect(element.textContent, key).toBe(lookup(own, key));
+    }
+  });
+
+  it('leaves no English sentence on the page, before or after connecting', async () => {
+    const page = await connectedPage({ i18n: await loadI18n(locale) });
+    const shown = (): string => squash(document.querySelector('.shell')?.textContent ?? '');
+    for (const sentence of sentences(en)) expect(shown(), sentence).not.toContain(sentence);
+    await page.run('disconnect');
+    for (const sentence of sentences(en)) expect(shown(), sentence).not.toContain(sentence);
+  });
+
+  it('keeps the session log in English', async () => {
+    const steps = ['lock', 'brightness low', 'device save a!b', 'unlock'];
+    const logOf = async (i18n: I18n): Promise<string> => {
+      const page = await connectedPage({ i18n });
+      for (const step of steps) await page.run(step);
+      return sessionLog({ console: page.app.store.get().console, wire: [] }, '1.2.3');
+    };
+    expect(await logOf(await loadI18n(locale))).toBe(await logOf(await loadI18n('en')));
+  });
+
+  it('answers a control in its own words', async () => {
+    const page = await connectedPage({ i18n: await loadI18n(locale) });
+    const own = await loadMessages(locale);
+    page.buttonByKey('lock').click();
+    await page.settle();
+    expect(page.text('toasts')).toBe(own.result.locked);
   });
 });

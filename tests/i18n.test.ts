@@ -3,8 +3,8 @@ import { errorRef } from '../src/app/app';
 import { parseCommand } from '../src/console/parse';
 import { SphereError, describeError, usageError } from '../src/protocol/errors';
 import { EMPTY_BOOK, normalizeLabel, validateLabel, withDevice } from '../src/storage/devices';
-import { ENGLISH, bootI18n, createI18n } from '../src/i18n/i18n';
-import { resolveLocale, withoutLanguageParameter } from '../src/i18n/locales';
+import { ENGLISH, bootI18n, createI18n, loadI18n, loadMessages } from '../src/i18n/i18n';
+import { type Locale, resolveLocale, withoutLanguageParameter } from '../src/i18n/locales';
 import { render } from '../src/i18n/message';
 import { type Messages, en } from '../src/i18n/messages/en';
 
@@ -164,5 +164,63 @@ describe('withoutLanguageParameter', () => {
   it('returns an address without one unchanged', () => {
     expect(withoutLanguageParameter('https://sphere.test/?a=1#x')).toBe('https://sphere.test/?a=1#x');
     expect(withoutLanguageParameter('http://127.0.0.1:4173/')).toBe('http://127.0.0.1:4173/');
+  });
+});
+
+/** Every message of a dictionary, by its dotted path. */
+function leaves(node: unknown, prefix = ''): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const [name, value] of Object.entries(node as Record<string, unknown>)) {
+    if (typeof value === 'string') found.set(`${prefix}${name}`, value);
+    else for (const [path, text] of leaves(value, `${prefix}${name}.`)) found.set(path, text);
+  }
+  return found;
+}
+
+const placeholders = (text: string): string[] =>
+  [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((match) => match[1] ?? '').sort();
+
+/** The languages that have a dictionary of their own. */
+const TRANSLATED: readonly Locale[] = ['ja'];
+
+/** Messages that are a name or a bare parameter, and so read the same as in English. */
+const SAME_AS_ENGLISH: Readonly<Partial<Record<Locale, readonly string[]>>> = {
+  ja: ['device.bluetooth', 'error.plain'],
+};
+
+describe.each(TRANSLATED)('the %s dictionary', (locale) => {
+  const english = leaves(en);
+
+  it('has every message the English one has, and none of its own', async () => {
+    const own = leaves(await loadMessages(locale));
+    expect([...own.keys()].sort()).toEqual([...english.keys()].sort());
+  });
+
+  it('uses the same parameters as English in every message', async () => {
+    for (const [key, text] of leaves(await loadMessages(locale))) {
+      expect(placeholders(text), key).toEqual(placeholders(english.get(key) ?? ''));
+    }
+  });
+
+  it('leaves no message empty', async () => {
+    for (const [key, text] of leaves(await loadMessages(locale))) {
+      expect(text.trim(), key).not.toBe('');
+      expect(text, key).not.toBe(key);
+    }
+  });
+
+  it('translates everything but names', async () => {
+    const untouched = [...leaves(await loadMessages(locale))]
+      .filter(([key, text]) => text === english.get(key))
+      .map(([key]) => key);
+    expect(untouched.sort()).toEqual([...(SAME_AS_ENGLISH[locale] ?? [])].sort());
+  });
+
+  it('is what the page gets when it asks for the language', async () => {
+    const loaded = await loadI18n(locale);
+    const own = await loadMessages(locale);
+    expect(loaded.locale).toBe(locale);
+    expect(loaded.t('page.lede')).toBe(own.page.lede);
+    expect(loaded.t('page.lede')).not.toBe(en.page.lede);
   });
 });

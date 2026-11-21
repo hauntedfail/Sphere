@@ -38,13 +38,22 @@ export function createI18n(locale: Locale, messages: Messages): I18n {
 export const ENGLISH: I18n = createI18n('en', en);
 
 /**
- * The translator for `locale`, fetching its dictionary if it is not English.
- * Each language is imported by name so the bundler gives it a file of its own.
+ * The dictionary for `locale`. Each language is imported by name, so the
+ * bundler gives it a file of its own and English visitors never fetch it.
  */
+export async function loadMessages(locale: Locale): Promise<Messages> {
+  switch (locale) {
+    case 'ja':
+      return (await import('./messages/ja')).ja;
+    default:
+      // The languages without a dictionary yet are known by name and read in English.
+      return en;
+  }
+}
+
+/** The translator for `locale`, fetching its dictionary if it is not English. */
 export async function loadI18n(locale: Locale): Promise<I18n> {
-  if (locale === 'en') return ENGLISH;
-  // No other dictionary exists yet: the language is known, its words are English.
-  return createI18n(locale, en);
+  return locale === 'en' ? ENGLISH : createI18n(locale, await loadMessages(locale));
 }
 
 /**

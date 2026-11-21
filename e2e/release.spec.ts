@@ -183,3 +183,24 @@ test('the page shows itself even if its script never runs', async ({ page, probl
   // The browser reports the script it was refused; that is this test's own doing.
   problems.length = 0;
 });
+
+test('fetches a dictionary only for the language it is shown in', async ({ page }) => {
+  const scripts = async (path: string): Promise<string[]> => {
+    const seen: string[] = [];
+    const listen = (request: { url(): string; resourceType(): string }): void => {
+      if (request.resourceType() === 'script') seen.push(new URL(request.url()).pathname);
+    };
+    page.on('request', listen);
+    await page.goto(path);
+    await expect(page.locator('main[data-mounted]')).toBeVisible();
+    page.off('request', listen);
+    return seen;
+  };
+
+  const english = await scripts('/');
+  const japanese = await scripts('/?lang=ja');
+  expect(japanese.length).toBe(english.length + 1);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('.lede')).toContainText('IQOS ILUMA を設定できます');
+  await expect(page.locator('#connect-button')).toHaveText('デバイスを接続');
+});
