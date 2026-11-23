@@ -199,27 +199,41 @@ for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
   });
 }
 
+/** Elements that reach past the right edge of the screen, apart from what sits in a box that scrolls. */
+function pastTheEdge(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const edge = document.documentElement.clientWidth;
+    return [...document.querySelectorAll('.shell *')]
+      .filter((element) => element.closest('.table-scroll') === null)
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        return box.width > 0 && box.right > edge + 0.5;
+      })
+      .map((element) => `${element.tagName.toLowerCase()}${element.id === '' ? '' : `#${element.id}`}.${element.className}`);
+  });
+}
+
 for (const locale of ['en', 'ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
-  test(`${locale}: the top bar and the choices stay inside a 320px screen`, async ({ page }) => {
+  test(`${locale}: everything stays inside a 320px screen`, async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto(`/?lang=${locale}`);
+    await expect(page.locator('main[data-mounted]')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    expect(await pastTheEdge(page), 'on the start page').toEqual([]);
+
     await page.locator('#demo-button').click();
     await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
     await page.evaluate(() => document.fonts.ready);
-    const past = await page.evaluate(() => {
-      const edge = document.documentElement.clientWidth;
-      const beyond = (element: Element, limit: number): number =>
-        Math.max(0, Math.round(element.getBoundingClientRect().right - limit));
-      return {
-        // The language switch is the last thing in the bar.
-        bar: beyond(document.querySelector('#language') as Element, edge),
-        // Each set of choices, against the row it sits in.
-        choices: [...document.querySelectorAll('.segmented')].map((choices) =>
-          beyond(choices, (choices.closest('.row') as Element).getBoundingClientRect().right),
+    expect(await pastTheEdge(page), 'connected').toEqual([]);
+
+    // A set of choices must also stay inside its own row, not only inside the screen.
+    const choices = await page.evaluate(() =>
+      [...document.querySelectorAll('.segmented')].map((element) =>
+        Math.round(
+          element.getBoundingClientRect().right - (element.closest('.row') as Element).getBoundingClientRect().right,
         ),
-      };
-    });
-    expect(past.bar, 'language switch past the screen edge, px').toBe(0);
-    expect(Math.max(...past.choices), 'choices past the edge of their row, px').toBe(0);
+      ),
+    );
+    expect(Math.max(...choices), 'choices past the edge of their row, px').toBeLessThanOrEqual(0);
   });
 }

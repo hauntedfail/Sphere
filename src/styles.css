@@ -446,12 +446,14 @@ main:focus {
   align-items: center;
   justify-content: center;
   min-height: 44px;
+  /* A label stays on one line while there is room; one longer than the screen breaks between words. */
+  max-width: 100%;
   padding: 0 18px;
   border: 1px solid var(--line-strong);
   background: var(--void);
   color: var(--ink);
   font-size: 14px;
-  white-space: nowrap;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -892,6 +894,7 @@ button.model-tile:hover {
 
 .battery {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   color: var(--mute);
@@ -1372,6 +1375,10 @@ button.model-tile:hover {
 /* ── Other widths ───────────────────────────────────────────────────────── */
 
 @media (max-width: 559px) {
+  .bar {
+    gap: 8px;
+  }
+
   .bar-device {
     display: none;
   }
