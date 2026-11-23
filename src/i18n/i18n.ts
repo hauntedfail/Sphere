@@ -31,7 +31,11 @@ export function createI18n(locale: Locale, messages: Messages): I18n {
   });
   return {
     locale,
-    t: (key, params) => String(instance.t(key, { ...params })),
+    // Handed over as `replace`, the parameters are values to fill in and
+    // nothing more. Passed as options they would share a namespace with
+    // i18next's own: one called `lng`, `ns`, `count` or `context` would
+    // change which message is looked up.
+    t: (key, params) => String(instance.t(key, { replace: { ...params } })),
   };
 }
 

@@ -82,7 +82,7 @@ export const ru = {
   },
   device: {
     batteryPending: 'Батарея ',
-    batteryAfterLevel: ' батарея',
+    batteryLevel: 'Батарея {{level}}',
     art: '{{model}}, {{battery}}',
     artUnknown: 'заряд не прочитан',
     artLevel: 'заряд {{level}}%',
@@ -189,8 +189,8 @@ export const ru = {
       title: 'Блокировка',
       lead: 'Заблокированным устройством нельзя пользоваться, пока его не разблокируют.',
       lend: 'Заблокируйте его, прежде чем одолжить или убрать, и разблокируйте здесь, когда оно снова понадобится.',
-      unlocked: 'Открыто',
-      locked: 'Закрыто',
+      unlocked: 'Разблокировано',
+      locked: 'Заблокировано',
     },
     find: {
       title: 'Поиск IQOS',

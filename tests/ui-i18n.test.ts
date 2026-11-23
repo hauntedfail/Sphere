@@ -69,6 +69,13 @@ describe('the page in English', () => {
     expect(document.querySelector('.lede')?.textContent).toBe(en.page.lede);
   });
 
+  it('puts the battery level before the word for it', async () => {
+    await connectedPage();
+    expect(squash(document.querySelector('.battery')?.textContent ?? '')).toBe('85% battery');
+    const parts = [...(document.querySelector('.battery')?.children ?? [])].map((part) => part.className);
+    expect(parts).toEqual(['battery-level dot-text', 'battery-label']);
+  });
+
   it('starts in the language the app was given', () => {
     const page = openPage();
     expect(page.app.store.get().i18n.locale).toBe('en');
@@ -260,6 +267,24 @@ describe('the language switch', () => {
     });
   });
 
+  it('does not mark a reading as changed because the words for it changed', async () => {
+    const page = await connectedPage({ loadI18n: loadMirror });
+    // The device answered, but without a voltage the page can show.
+    page.app.patch((state) => {
+      if (state.status.status !== 'ready') return state;
+      const { batteryVoltage: _dropped, ...status } = state.status.value;
+      return { ...state, status: { status: 'ready', value: status } };
+    });
+    // A command starts: what is on screen now is what later readings are compared with.
+    await page.run('lock');
+    await choose('ko');
+    const failed = [...document.querySelectorAll('#device-pane dd')].filter((cell) =>
+      cell.textContent?.includes('⟦field.readFailed⟧'),
+    );
+    expect(failed.length).toBe(1);
+    expect(failed[0]?.className).toBe('');
+  });
+
   it('follows a language chosen any other way', async () => {
     const page = openPage({ loadI18n: loadMirror });
     await page.run('lang zh-Hant');
@@ -324,6 +349,15 @@ describe.each(['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it'] as const)('the page
       return sessionLog({ console: page.app.store.get().console, wire: [] }, '1.2.3');
     };
     expect(await logOf(await loadI18n(locale))).toBe(await logOf(await loadI18n('en')));
+  });
+
+  it('puts the battery level where the language says it goes', async () => {
+    await connectedPage({ i18n: await loadI18n(locale) });
+    const own = await loadMessages(locale);
+    expect(squash(document.querySelector('.battery')?.textContent ?? '')).toBe(
+      squash(own.device.batteryLevel.replace('{{level}}', '85%')),
+    );
+    expect(document.querySelectorAll('.battery .battery-label').length).toBe(1);
   });
 
   it('answers a control in its own words', async () => {

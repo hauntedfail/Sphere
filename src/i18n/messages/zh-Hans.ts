@@ -80,7 +80,7 @@ export const zhHans = {
   },
   device: {
     batteryPending: '电量 ',
-    batteryAfterLevel: ' 电量',
+    batteryLevel: '电量 {{level}}',
     art: '{{model}}，{{battery}}',
     artUnknown: '电量未读取',
     artLevel: '电量 {{level}}%',

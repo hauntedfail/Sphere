@@ -62,6 +62,14 @@ describe('createI18n', () => {
     );
   });
 
+  it('reads a parameter as a value, whatever it is called', () => {
+    // These are names i18next gives a meaning of its own when they arrive as options.
+    const lede = '{{count}} {{context}} {{lng}} {{ns}} {{defaultValue}} {{ordinal}} {{replace}}';
+    const odd = { ...en, page: { ...en.page, lede } } as unknown as Messages;
+    const params = { count: 2, context: 'x', lng: 'en', ns: 'other', defaultValue: 'd', ordinal: 1, replace: 'r' };
+    expect(createI18n('ja', odd).t('page.lede', params)).toBe('2 x en other d 1 r');
+  });
+
   it('falls back to English for a key the language lacks', () => {
     const partial = { ...en, page: { ...en.page, lede: undefined } } as unknown as Messages;
     expect(createI18n('ja', partial).t('page.lede')).toBe(en.page.lede);
@@ -250,11 +258,25 @@ describe.each(TRANSLATED)('the %s dictionary', (locale) => {
     expect(rows.stickFirmware.toLowerCase()).not.toContain(rows.holder.toLowerCase());
   });
 
+  it('says where the battery level goes in its own word order', async () => {
+    const { batteryLevel } = (await loadMessages(locale)).device;
+    expect(batteryLevel.split('{{level}}').length).toBe(2);
+    expect(batteryLevel.replace('{{level}}', '').trim()).not.toBe('');
+  });
+
   it('is what the page gets when it asks for the language', async () => {
     const loaded = await loadI18n(locale);
     const own = await loadMessages(locale);
     expect(loaded.locale).toBe(locale);
     expect(loaded.t('page.lede')).toBe(own.page.lede);
     expect(loaded.t('page.lede')).not.toBe(en.page.lede);
+  });
+});
+
+describe('the Russian dictionary', () => {
+  it('names the lock choices with the words it uses for that state everywhere else', async () => {
+    const { settings } = await loadMessages('ru');
+    expect(settings.lock.locked.toLowerCase()).toBe(settings.value.locked);
+    expect(settings.lock.unlocked.toLowerCase()).toBe(settings.value.unlocked);
   });
 });

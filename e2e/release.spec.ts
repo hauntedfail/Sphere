@@ -241,3 +241,21 @@ for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
     await expectNoSidewaysScroll(page);
   });
 }
+
+test('opens in English when the dictionary of the language asked for cannot be fetched', async ({ page, problems }) => {
+  // What a visitor meets just after a deploy has replaced the files, or with the network gone.
+  let refused = 0;
+  await page.route(/\/assets\/ja-[^/]+\.js$/, (route) => {
+    refused++;
+    return route.abort();
+  });
+  await page.goto('/?lang=ja');
+  await expect(page.locator('main[data-mounted]')).toBeVisible();
+  expect(refused).toBeGreaterThan(0);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('#language')).toHaveValue('en');
+  await expect(page.locator('#connect-button')).toHaveText('Connect a device');
+  await expect(page.locator('.lede')).toBeVisible();
+  // The browser reports the script it was refused; that is this test's own doing.
+  problems.length = 0;
+});

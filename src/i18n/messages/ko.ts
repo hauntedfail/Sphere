@@ -81,7 +81,7 @@ export const ko = {
   },
   device: {
     batteryPending: '배터리 ',
-    batteryAfterLevel: ' 배터리',
+    batteryLevel: '배터리 {{level}}',
     art: '{{model}}, {{battery}}',
     artUnknown: '배터리 잔량을 읽지 않음',
     artLevel: '배터리 {{level}}%',

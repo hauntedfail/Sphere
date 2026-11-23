@@ -80,7 +80,7 @@ export const en = {
   },
   device: {
     batteryPending: 'Battery ',
-    batteryAfterLevel: ' battery',
+    batteryLevel: '{{level}} battery',
     art: '{{model}}, {{battery}}',
     artUnknown: 'battery not read',
     artLevel: 'battery {{level}}%',

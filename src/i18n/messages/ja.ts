@@ -82,7 +82,7 @@ export const ja = {
   },
   device: {
     batteryPending: 'バッテリー ',
-    batteryAfterLevel: ' バッテリー',
+    batteryLevel: 'バッテリー {{level}}',
     art: '{{model}}、{{battery}}',
     artUnknown: 'バッテリー残量は未読み取り',
     artLevel: 'バッテリー残量 {{level}}%',

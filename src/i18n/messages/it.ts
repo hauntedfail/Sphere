@@ -84,7 +84,7 @@ export const it = {
   },
   device: {
     batteryPending: 'Batteria ',
-    batteryAfterLevel: ' batteria',
+    batteryLevel: 'Batteria {{level}}',
     art: '{{model}}, {{battery}}',
     artUnknown: 'batteria non letta',
     artLevel: 'batteria al {{level}}%',

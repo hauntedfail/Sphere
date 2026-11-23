@@ -99,6 +99,13 @@ function button(key: string, label: string, onClick: () => void, extraClass = ''
   );
 }
 
+/**
+ * Stands in a message for a value the page draws as an element of its own,
+ * so that the message can say where among its words the element goes. A
+ * private-use character: no dictionary and no device name contains it.
+ */
+const SLOT = '\uE000';
+
 /** What a control shows while its value is not known. */
 const UNKNOWN = 'unknown';
 
@@ -296,6 +303,9 @@ function serialText(t: Translate, device: ConnectedDevice): string {
 
 type RowName = keyof Messages['device']['rows'];
 
+/** Stands for a voltage reading that failed, where a row's text is compared between draws. */
+const VOLTAGE_FAILED = 'failed';
+
 function rowsFor(state: AppState, device: ConnectedDevice): Row[] {
   const { t } = state.i18n;
   const none = t('device.none');
@@ -324,16 +334,21 @@ function rowsFor(state: AppState, device: ConnectedDevice): Row[] {
       statusRow('holderFirmware', status?.holderFirmware && formatFirmware(status.holderFirmware)),
     );
   }
+  const voltageFailed = status !== undefined && status.batteryVoltage === undefined;
   rows.push(
-    statusRow(
-      'batteryVoltage',
-      status === undefined
-        ? undefined
-        : status.batteryVoltage === undefined
-          ? t('field.readFailed')
+    {
+      ...statusRow(
+        'batteryVoltage',
+        status?.batteryVoltage === undefined
+          ? voltageFailed
+            ? t('field.readFailed')
+            : undefined
           : `${status.batteryVoltage.toFixed(3)}V`,
-      true,
-    ),
+        true,
+      ),
+      // What is compared between draws must not change with the language.
+      ...(voltageFailed ? { text: VOLTAGE_FAILED } : {}),
+    },
     { ...label('modelNumber'), value: device.info.modelNumber ?? none },
     { ...label('softwareRev'), value: device.info.softwareRevision ?? none },
     { ...label('manufacturer'), value: device.info.manufacturerName ?? none },
@@ -373,17 +388,16 @@ function batteryReading(state: AppState, ui: PaneUi): HTMLElement {
     return h('p', { class: 'battery' }, h('span', { class: 'battery-label' }, t('device.batteryPending')), placeholder);
   }
   const changed = changedSince(ui.memory, 'battery', String(level));
-  return h(
-    'p',
-    { class: 'battery' },
-    h(
-      'span',
-      { class: `battery-level dot-text${changed ? ' changed' : ''}`, attrs: { id: 'battery-level' } },
-      String(level),
-      h('span', { class: 'battery-unit' }, '%'),
-    ),
-    h('span', { class: 'battery-label' }, t('device.batteryAfterLevel')),
+  const reading = h(
+    'span',
+    { class: `battery-level dot-text${changed ? ' changed' : ''}`, attrs: { id: 'battery-level' } },
+    String(level),
+    h('span', { class: 'battery-unit' }, '%'),
   );
+  // The message says where the level goes among its words; the level itself is the element above.
+  const [before = '', after = ''] = t('device.batteryLevel', { level: SLOT }).split(SLOT);
+  const label = (text: string): Child => (text.trim() === '' ? null : h('span', { class: 'battery-label' }, text));
+  return h('p', { class: 'battery' }, label(before), reading, label(after));
 }
 
 /** The battery level to draw: only a reading that succeeded counts. */
