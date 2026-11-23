@@ -33,7 +33,7 @@ Needed whenever a translation uses a character it did not use before;
 
 ```bash
 pnpm fonts:chars   # writes tools/fonts/chars.json from the dictionaries
-pnpm fonts:build   # fetches the sources, writes the fonts and coverage.json
+pnpm fonts:build   # fetches the sources and writes the fonts
 ```
 
 `pnpm fonts:build` needs [uv](https://docs.astral.sh/uv/), which supplies
@@ -42,11 +42,16 @@ fonts it writes are committed, like the two Latin ones. The sources are
 pinned by URL and SHA-256 in `tools/fonts/sources.json` and cached, untracked,
 in `tools/fonts/.cache/`.
 
-The conversion has tests of its own:
+The conversion has tests of its own, run with the same fontTools as the
+build:
 
 ```bash
-uv run --with pytest --with fonttools pytest tools/fonts
+pnpm fonts:test
 ```
+
+`tests/fonts.test.ts` does not take the tool's word for what it wrote. It
+reads each font file's character map (`tests/woff2.ts`), the two Latin ones
+included, and holds every dictionary to that.
 
 ## The numbers behind the dot face
 

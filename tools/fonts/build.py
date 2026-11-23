@@ -11,9 +11,8 @@ src/assets/fonts/:
   text-<language>.woff2   the sentence face: a subset of a text font
 
 Each holds only the characters the language's dictionary uses, which
-`pnpm fonts:chars` writes into chars.json. coverage.json records what each
-file ended up holding, and tests/fonts.test.ts checks the dictionaries
-against it.
+`pnpm fonts:chars` writes into chars.json. tests/fonts.test.ts reads the
+files written here and checks the dictionaries against what they hold.
 
 Sources are fetched once into .cache/ and checked against the SHA-256 in
 sources.json. Nothing here runs during `pnpm build`.
@@ -131,8 +130,8 @@ def text(source: TTFont, code_points: set[int], family: str) -> TTFont:
     return font
 
 
-def save(font: TTFont, name: str) -> list[int]:
-    """Write `font` as WOFF2 and return the code points it holds.
+def save(font: TTFont, name: str) -> None:
+    """Write `font` as WOFF2.
 
     The dates inside the file are fixed, so the same sources and the same
     characters give the same bytes and a rebuild that changes nothing shows
@@ -144,7 +143,6 @@ def save(font: TTFont, name: str) -> list[int]:
     path = OUTPUT / name
     font.save(path)
     print(f"  {name}: {path.stat().st_size} bytes, {len(font.getBestCmap())} characters")
-    return sorted(font.getBestCmap())
 
 
 def main() -> None:
@@ -154,7 +152,6 @@ def main() -> None:
         raise SystemExit("chars.json is missing: run pnpm fonts:chars first")
     chars = json.loads(chars_path.read_text())
 
-    coverage: dict[str, list[int]] = {}
     for locale, faces in config["locales"].items():
         if locale not in chars:
             raise SystemExit(f"chars.json has nothing for {locale}: run pnpm fonts:chars")
@@ -165,14 +162,11 @@ def main() -> None:
 
         dots_source = config["sources"][faces["dots"]["source"]]
         dots_font = dots(open_font(dots_source, faces["dots"].get("member")), code_points, f"Sphere Dots {tag}")
-        coverage[f"dots-{slug}.woff2"] = save(dots_font, f"dots-{slug}.woff2")
+        save(dots_font, f"dots-{slug}.woff2")
 
         text_source = config["sources"][faces["text"]["source"]]
         text_font = text(open_font(text_source, faces["text"].get("member")), code_points, f"Sphere Text {tag}")
-        coverage[f"text-{slug}.woff2"] = save(text_font, f"text-{slug}.woff2")
-
-    (OUTPUT / "coverage.json").write_text(json.dumps(coverage, separators=(",", ":")) + "\n")
-    print("wrote coverage.json")
+        save(text_font, f"text-{slug}.woff2")
 
 
 if __name__ == "__main__":

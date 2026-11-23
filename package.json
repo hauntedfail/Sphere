@@ -15,8 +15,9 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "fonts:chars": "FONT_CHARS_WRITE=1 vitest run tests/fonts.test.ts --reporter=dot || true",
+    "fonts:chars": "FONT_CHARS_WRITE=1 vitest run tests/fonts.test.ts",
     "fonts:build": "uv run tools/fonts/build.py",
+    "fonts:test": "uv run --with pytest==9.2.0 --with fonttools==4.68.0 pytest tools/fonts",
     "check": "pnpm typecheck && pnpm coverage && pnpm e2e"
   },
   "packageManager": "pnpm@10.28.2",
