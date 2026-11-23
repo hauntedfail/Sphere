@@ -9,17 +9,10 @@ import { byId, h, redraw } from './dom';
 import { bindLanguage, dropLanguageParameter } from './language';
 import { createStage } from './dots';
 import { sessionLog } from './log';
-import {
-  commitMemory,
-  createPaneUi,
-  devicePane,
-  modelTiles,
-  resetPaneUi,
-  saveForm,
-  savedDevices,
-  settingsPane,
-} from './panes';
+import { commitMemory, createPaneUi, resetPaneUi } from './pane-parts';
+import { devicePane, modelTiles, saveForm, savedDevices } from './panes';
 import { GLOBE_SIZE, globeScene } from './scenes';
+import { settingsPane } from './settings-pane';
 import { applyStaticText } from './static';
 
 /** What to say where Bluetooth cannot be used. `null` where it can. */
@@ -290,9 +283,10 @@ export function mount(app: App): void {
     if (changed(state, previous, ['device', 'i18n'])) {
       const device = state.device;
       // A change of language redraws the form too; what was being typed into it stays.
-      const typed = previous?.device === device ? document.querySelector<HTMLInputElement>('#save-label')?.value : undefined;
+      const labelField = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>('#save-label');
+      const typed = previous?.device === device ? labelField()?.value : undefined;
       redraw(saveContainer, device?.kind === 'ble' ? [saveForm(device, run, t)] : []);
-      const field = document.querySelector<HTMLInputElement>('#save-label');
+      const field = labelField();
       if (field !== null && typed !== undefined) field.value = typed;
     }
     if (changed(state, previous, DEVICE_KEYS)) {

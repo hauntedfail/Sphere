@@ -128,7 +128,8 @@ describe('an error as a message', () => {
   });
 
   it('has no prefix for a mistake in a command', () => {
-    expect(render(ENGLISH.t, errorRef(usageError('Usage: brightness [high|low]')))).toBe('Usage: brightness [high|low]');
+    const usage = 'Usage: brightness [high|low]';
+    expect(render(ENGLISH.t, errorRef(usageError(usage)))).toBe(usage);
   });
 
   it('is the message itself for any other error, and the value for anything else thrown', () => {
@@ -207,7 +208,14 @@ const SAME_AS_ENGLISH: Readonly<Partial<Record<Locale, readonly string[]>>> = {
   'zh-Hans': ['error.plain', ...FLEX_NAMES],
   'zh-Hant': ['error.plain', ...FLEX_NAMES],
   ko: ['device.art', 'error.plain', 'settings.missing.separator'],
-  ru: ['device.art', 'device.bluetooth', 'error.plain', 'page.matrix.flex', 'settings.missing.separator', ...FLEX_NAMES],
+  ru: [
+    'device.art',
+    'device.bluetooth',
+    'error.plain',
+    'page.matrix.flex',
+    'settings.missing.separator',
+    ...FLEX_NAMES,
+  ],
   // Italian also says "no", "holder", "Performance" and "Eco".
   it: [
     'device.art',

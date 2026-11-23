@@ -242,7 +242,7 @@ for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
   });
 }
 
-test('opens in English when the dictionary of the language asked for cannot be fetched', async ({ page, problems }) => {
+test('opens in English when the dictionary asked for cannot be fetched', async ({ page, problems }) => {
   // What a visitor meets just after a deploy has replaced the files, or with the network gone.
   let refused = 0;
   await page.route(/\/assets\/ja-[^/]+\.js$/, (route) => {

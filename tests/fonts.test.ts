@@ -115,7 +115,8 @@ if (process.env['FONT_CHARS_WRITE'] !== undefined) {
     });
 
     it('are the files the stylesheet loads, no more and no fewer', () => {
-      const loaded = [...stylesheet().matchAll(/url\('\.\/assets\/fonts\/([^']+)'\)/g)].map((match) => match[1]).sort();
+      const urls = stylesheet().matchAll(/url\('\.\/assets\/fonts\/([^']+)'\)/g);
+      const loaded = [...urls].map((match) => match[1]).sort();
       expect(loaded).toEqual(readdirSync(FONTS).sort());
     });
 

@@ -635,7 +635,7 @@ describe('createSimulator', () => {
 });
 
 describe('messages the page can translate', () => {
-  /** What the controls send, from src/ui/panes.ts and view.ts. The empty line stops Find my IQOS. */
+  /** What the controls send, from src/ui/panes.ts, settings-pane.ts and view.ts. The empty line stops Find my IQOS. */
   const CONTROL_LINES = [
     'refresh',
     'diagnosis',

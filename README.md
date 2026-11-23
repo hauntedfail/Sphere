@@ -242,7 +242,10 @@ src/
                Touches no DOM; i18next is used here and nowhere else
   ui/          DOM rendering; reads state, calls app.run(line)
                view.ts     binds the page: notices, focus, redraws
-               panes.ts    device card and settings, state in, nodes out
+               panes.ts    the device card and the start page's lists,
+                           state in, nodes out
+               settings-pane.ts  each setting: picture, guide, controls
+               pane-parts.ts     the rows, switches and choices they share
                dots.ts     dot-matrix screens and the timer that moves them
                scenes.ts   the pictures: globe, each model, each setting
                log.ts      the session log as text

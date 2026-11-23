@@ -86,7 +86,10 @@ describe('the page in English', () => {
 /** A language that shows each message as its key, so a test can tell where a word came from. */
 const mirror: I18n = {
   locale: 'ja',
-  t: (key, params) => `⟦${key}${params === undefined || Object.keys(params).length === 0 ? '' : ` ${JSON.stringify(params)}`}⟧`,
+  t: (key, params) => {
+    const filled = params === undefined || Object.keys(params).length === 0 ? '' : ` ${JSON.stringify(params)}`;
+    return `⟦${key}${filled}⟧`;
+  },
 };
 
 describe('what a control answers', () => {

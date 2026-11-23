@@ -9,7 +9,7 @@ import { brotliDecompressSync } from 'node:zlib';
  * table, which is all the fonts shipped here use.
  */
 
-/** The tags a WOFF2 table directory abbreviates to a number. Only the position of `cmap`, `glyf` and `loca` matters here. */
+/** The tags a WOFF2 table directory abbreviates to a number. Only `cmap`, `glyf` and `loca` matter here. */
 const CMAP = 0;
 const GLYF = 10;
 const LOCA = 11;
