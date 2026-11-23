@@ -198,3 +198,28 @@ for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
     await expectNoSidewaysScroll(page);
   });
 }
+
+for (const locale of ['en', 'ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
+  test(`${locale}: the top bar and the choices stay inside a 320px screen`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto(`/?lang=${locale}`);
+    await page.locator('#demo-button').click();
+    await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
+    await page.evaluate(() => document.fonts.ready);
+    const past = await page.evaluate(() => {
+      const edge = document.documentElement.clientWidth;
+      const beyond = (element: Element, limit: number): number =>
+        Math.max(0, Math.round(element.getBoundingClientRect().right - limit));
+      return {
+        // The language switch is the last thing in the bar.
+        bar: beyond(document.querySelector('#language') as Element, edge),
+        // Each set of choices, against the row it sits in.
+        choices: [...document.querySelectorAll('.segmented')].map((choices) =>
+          beyond(choices, (choices.closest('.row') as Element).getBoundingClientRect().right),
+        ),
+      };
+    });
+    expect(past.bar, 'language switch past the screen edge, px').toBe(0);
+    expect(Math.max(...past.choices), 'choices past the edge of their row, px').toBe(0);
+  });
+}

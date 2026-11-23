@@ -383,7 +383,9 @@ main:focus {
  * under its own name, and no one language's font holds them all.
  */
 .language {
-  flex: none;
+  /* May give way on a narrow screen: a long state beside it must not push it off the edge. */
+  flex: 0 1 auto;
+  min-width: 3.5em;
   height: 28px;
   max-width: 9.5em;
   padding: 0 6px;
@@ -1258,13 +1260,23 @@ button.model-tile:hover {
   }
 }
 
+/*
+ * The choices sit side by side, and go one under another where their words
+ * are too long for the row. The lines between them are the gaps, showing the
+ * ground behind, so they are right whichever way the choices fall.
+ */
 .segmented {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 1px;
+  max-width: 100%;
   border: 1px solid var(--line-strong);
+  background: var(--line-strong);
 }
 
 .segment {
+  flex: 1 1 auto;
   min-height: 38px;
   padding: 0 14px;
   border: 0;
@@ -1272,10 +1284,6 @@ button.model-tile:hover {
   color: var(--mute);
   font-size: 13px;
   cursor: pointer;
-}
-
-.segment + .segment {
-  border-left: 1px solid var(--line-strong);
 }
 
 .segment:hover {
