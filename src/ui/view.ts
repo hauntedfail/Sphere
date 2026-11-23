@@ -195,9 +195,12 @@ export function mount(app: App): void {
   // Choosing a language does not queue, so nothing waits on it and a choice
   // that works needs no toast: the page itself is the answer. One that fails
   // leaves the page as it was, and that has to be said.
-  bindLanguage(languageSelect, async (locale) => {
+  bindLanguage(languageSelect, async (locale, latest) => {
     const newest = app.store.get().console.at(-1)?.id ?? 0;
     await app.run(`lang ${locale}`);
+    // Overtaken by a later choice: the app dropped this one without a word,
+    // and the select and any failure are the later one's to settle.
+    if (!latest()) return;
     const state = app.store.get();
     languageSelect.value = state.i18n.locale;
     const failure = state.console.find((line) => line.id > newest && line.tone === 'error' && aboutLanguage(line));

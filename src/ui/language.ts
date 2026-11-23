@@ -6,17 +6,29 @@ import { h } from './dom';
  * Fill `select` with every language under its own name, and call `choose`
  * when one is picked. While a choice is being carried out the element says
  * so in `data-busy`.
+ *
+ * A language takes a moment to load, so a second choice can be made before
+ * the first is carried out, and the two can finish in either order. Only the
+ * choice made last counts: `latest` tells `choose` whether it still is that
+ * one once it has finished, and an earlier choice ending leaves the element
+ * alone.
  */
-export function bindLanguage(select: HTMLSelectElement, choose: (locale: Locale) => Promise<void>): void {
+export function bindLanguage(
+  select: HTMLSelectElement,
+  choose: (locale: Locale, latest: () => boolean) => Promise<void>,
+): void {
   select.replaceChildren(
     ...LOCALES.map((locale) => h('option', { attrs: { value: locale, lang: locale } }, LOCALE_NAMES[locale])),
   );
+  let choices = 0;
   select.addEventListener('change', () => {
     const locale = parseLocale(select.value);
     if (locale === null) return;
+    const choice = ++choices;
+    const latest = (): boolean => choice === choices;
     select.dataset['busy'] = '';
-    void choose(locale).finally(() => {
-      delete select.dataset['busy'];
+    void choose(locale, latest).finally(() => {
+      if (latest()) delete select.dataset['busy'];
     });
   });
 }

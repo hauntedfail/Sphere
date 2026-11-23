@@ -204,6 +204,62 @@ describe('the language switch', () => {
     expect(page.text('toasts')).toBe('Device locked');
   });
 
+  describe('when a second language is chosen before the first has loaded', () => {
+    const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+    const pick = (locale: Locale): void => {
+      select().value = locale;
+      select().dispatchEvent(new Event('change'));
+    };
+    /** Japanese then Korean, each taking as long to load as `delays` says. */
+    function pickBoth(delays: { ja: number; ko: number }, failing: Locale | null = null) {
+      const page = openPage({
+        loadI18n: async (locale) => {
+          await pause(locale === 'ja' ? delays.ja : delays.ko);
+          if (locale === failing) throw new Error('offline');
+          return loadMirror(locale);
+        },
+      });
+      pick('ja');
+      pick('ko');
+      return page;
+    }
+    const busy = (): boolean => select().dataset['busy'] !== undefined;
+
+    it('keeps showing the later choice, as busy, when the earlier one loads first', async () => {
+      const page = pickBoth({ ja: 10, ko: 50 });
+      await pause(30);
+      // Japanese has loaded and been dropped; Korean is still on its way.
+      expect(page.app.store.get().i18n.locale).toBe('en');
+      expect(select().value).toBe('ko');
+      expect(busy()).toBe(true);
+      await vi.waitFor(() => expect(busy()).toBe(false));
+      expect(select().value).toBe('ko');
+      expect(document.documentElement.lang).toBe('ko');
+    });
+
+    it('is done as soon as the later choice has loaded, whatever the earlier one does', async () => {
+      const page = pickBoth({ ja: 50, ko: 10 });
+      await vi.waitFor(() => expect(page.app.store.get().i18n.locale).toBe('ko'));
+      await vi.waitFor(() => expect(busy()).toBe(false));
+      await pause(60);
+      expect(select().value).toBe('ko');
+      expect(busy()).toBe(false);
+      expect(document.documentElement.lang).toBe('ko');
+    });
+
+    it('reports the later choice failing once, and not again when the earlier one ends', async () => {
+      const page = pickBoth({ ja: 120, ko: 10 }, 'ko');
+      await vi.waitFor(() => expect(page.text('toasts')).toContain('could not load 한국어'), { interval: 5 });
+      expect(select().value).toBe('en');
+      // Japanese is still loading. Take the notice away, and see that its ending does not bring it back.
+      document.getElementById('toasts')?.replaceChildren();
+      await pause(160);
+      expect(page.text('toasts')).toBe('');
+      expect(select().value).toBe('en');
+      expect(busy()).toBe(false);
+    });
+  });
+
   it('follows a language chosen any other way', async () => {
     const page = openPage({ loadI18n: loadMirror });
     await page.run('lang zh-Hant');
