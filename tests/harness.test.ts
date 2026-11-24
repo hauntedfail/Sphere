@@ -113,6 +113,13 @@ describe('the checks themselves', () => {
     expect(pnpmCommands(['````', '```', 'pnpm fenced', '```', '````'].join('\n'))).toEqual(['fenced']);
   });
 
+  it('close a code block whatever the line ending', () => {
+    const lines = ['~~~', '[inside](missing.md)', '~~~', '[outside](docs/INDEX.md)'];
+    for (const ending of ['\n', '\r\n', '\r']) {
+      expect(localLinks(lines.join(ending))).toEqual([{ path: 'docs/INDEX.md', anchor: null }]);
+    }
+  });
+
   it('name headings the way GitHub does', () => {
     const markdown = ['# Run it', '## Differences from the `CLI`', '## What it is, and is not', '## Run it', '```', '# a comment', '```'];
     expect([...headingAnchors(markdown.join('\n'))]).toEqual([

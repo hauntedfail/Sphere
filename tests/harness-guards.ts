@@ -33,7 +33,8 @@ function fences(markdown: string): { prose: string; blocks: string[] } {
   const prose: string[] = [];
   const blocks: string[] = [];
   let open: { fence: string; lines: string[] } | null = null;
-  for (const line of markdown.split('\n')) {
+  // CommonMark ends a line at LF, CRLF or a lone CR.
+  for (const line of markdown.split(/\r\n|\n|\r/)) {
     if (open === null) {
       const fence = OPENING_FENCE.exec(line)?.[1];
       if (fence === undefined) prose.push(line);
