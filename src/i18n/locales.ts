@@ -36,7 +36,11 @@ const TRADITIONAL_REGIONS: ReadonlySet<string> = new Set(['tw', 'hk', 'mo']);
 export function matchLocale(tag: string): Locale | null {
   const lowered = tag.trim().toLowerCase();
   if (!LANGUAGE_TAG.test(lowered)) return null;
-  const [language, ...rest] = lowered.split('-');
+  const [language, ...subtags] = lowered.split('-');
+  // Script and region come before the first single-letter subtag. What follows
+  // one is an extension (`-u-`) or private use (`-x-`): zh-CN-x-tw is not Taiwan.
+  const singleton = subtags.findIndex((part) => part.length === 1);
+  const rest = singleton === -1 ? subtags : subtags.slice(0, singleton);
   if (language === 'zh') {
     // An explicit script wins over the region: zh-Hans-HK is simplified.
     if (rest.includes('hant')) return 'zh-Hant';

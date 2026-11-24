@@ -19,11 +19,41 @@ export function forbiddenTrackedPaths(paths: readonly string[]): string[] {
   return paths.filter((path) => FORBIDDEN_TRACKED.some((pattern) => pattern.test(path)));
 }
 
-const FENCE = /^```[^\n]*\n[\s\S]*?^```[^\n]*$/gm;
+/** A line that opens a code block: three or more backticks or tildes, after up to three spaces. */
+const OPENING_FENCE = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/;
+const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
+
+/**
+ * The document split into prose and fenced code blocks, as CommonMark reads
+ * fences: a block closes only on a fence of the same character, at least as
+ * long as the one that opened it, with nothing after it. One left open runs
+ * to the end of the document.
+ */
+function fences(markdown: string): { prose: string; blocks: string[] } {
+  const prose: string[] = [];
+  const blocks: string[] = [];
+  let open: { fence: string; lines: string[] } | null = null;
+  for (const line of markdown.split('\n')) {
+    if (open === null) {
+      const fence = OPENING_FENCE.exec(line)?.[1];
+      if (fence === undefined) prose.push(line);
+      else open = { fence, lines: [line] };
+      continue;
+    }
+    open.lines.push(line);
+    const fence = CLOSING_FENCE.exec(line)?.[1];
+    if (fence !== undefined && fence[0] === open.fence[0] && fence.length >= open.fence.length) {
+      blocks.push(open.lines.join('\n'));
+      open = null;
+    }
+  }
+  if (open !== null) blocks.push(open.lines.join('\n'));
+  return { prose: prose.join('\n'), blocks };
+}
 
 /** The document without its fenced code blocks, which hold no links or headings. */
 function prose(markdown: string): string {
-  return markdown.replace(FENCE, '');
+  return fences(markdown).prose;
 }
 
 export interface LocalLink {
@@ -69,9 +99,9 @@ export function headingAnchors(markdown: string): Set<string> {
 
 /** Everything written as code: fenced blocks and inline spans. */
 function code(markdown: string): string[] {
-  const fenced = markdown.match(FENCE) ?? [];
-  const inline = [...prose(markdown).matchAll(/`([^`\n]+)`/g)].map((match) => match[1] ?? '');
-  return [...fenced, ...inline];
+  const { prose: text, blocks } = fences(markdown);
+  const inline = [...text.matchAll(/`([^`\n]+)`/g)].map((match) => match[1] ?? '');
+  return [...blocks, ...inline];
 }
 
 /** What follows `pnpm` wherever a document shows a command: `pnpm check` gives `check`. */
@@ -83,7 +113,7 @@ export function pnpmCommands(markdown: string): string[] {
   return [...names];
 }
 
-const TRACKED_ROOTS = /^(src|tests|e2e|docs|public|\.github)\/[\w./@-]*$/;
+const TRACKED_ROOTS = /^(src|tests|e2e|docs|public|tools|\.github)\/[\w./@-]*$/;
 
 /** Inline code that names a file or directory under one of the committed directories. */
 export function namedPaths(markdown: string): string[] {

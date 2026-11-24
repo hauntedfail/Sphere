@@ -145,12 +145,17 @@ def save(font: TTFont, name: str) -> None:
     print(f"  {name}: {path.stat().st_size} bytes, {len(font.getBestCmap())} characters")
 
 
+def read_json(path: Path) -> dict:
+    """Read a JSON file as UTF-8, as `pnpm fonts:chars` writes it, whatever the locale's encoding."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def main() -> None:
-    config = json.loads((HERE / "sources.json").read_text())
+    config = read_json(HERE / "sources.json")
     chars_path = HERE / "chars.json"
     if not chars_path.exists():
         raise SystemExit("chars.json is missing: run pnpm fonts:chars first")
-    chars = json.loads(chars_path.read_text())
+    chars = read_json(chars_path)
 
     for locale, faces in config["locales"].items():
         if locale not in chars:

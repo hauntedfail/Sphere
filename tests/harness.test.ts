@@ -16,6 +16,16 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (path: string): string => readFileSync(join(ROOT, path), 'utf8');
 const exists = (path: string): boolean => existsSync(join(ROOT, path));
 
+/** Whether `.gitignore` keeps `path` out of the repository. */
+function ignored(path: string): boolean {
+  try {
+    execFileSync('git', ['check-ignore', '--quiet', '--no-index', path], { cwd: ROOT });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const INDEX = 'docs/INDEX.md';
 const ENTRY_LINE_BUDGET = 80;
 
@@ -84,6 +94,25 @@ describe('the checks themselves', () => {
     ]);
   });
 
+  it('close a code block only on a fence like the one that opened it', () => {
+    const markdown = [
+      '````markdown',
+      '```',
+      '[inside a longer fence](missing.md)',
+      '```',
+      '[still inside](missing.md)',
+      '````',
+      '~~~',
+      '```',
+      '[inside a tilde fence](missing.md)',
+      '~~~ not a close',
+      '~~~~ ',
+      '[outside](docs/INDEX.md)',
+    ].join('\n');
+    expect(localLinks(markdown)).toEqual([{ path: 'docs/INDEX.md', anchor: null }]);
+    expect(pnpmCommands(['````', '```', 'pnpm fenced', '```', '````'].join('\n'))).toEqual(['fenced']);
+  });
+
   it('name headings the way GitHub does', () => {
     const markdown = ['# Run it', '## Differences from the `CLI`', '## What it is, and is not', '## Run it', '```', '# a comment', '```'];
     expect([...headingAnchors(markdown.join('\n'))]).toEqual([
@@ -100,8 +129,9 @@ describe('the checks themselves', () => {
   });
 
   it('find the paths a document names under the committed directories', () => {
-    const markdown = 'The policy is in `public/_headers` and `src/ui/`; `dist/` is built, `app.run(line)` is code.';
-    expect(namedPaths(markdown)).toEqual(['public/_headers', 'src/ui/']);
+    const markdown =
+      'The policy is in `public/_headers` and `src/ui/`, the fonts come from `tools/fonts/build.py`; `dist/` is built, `app.run(line)` is code.';
+    expect(namedPaths(markdown)).toEqual(['public/_headers', 'src/ui/', 'tools/fonts/build.py']);
   });
 });
 
@@ -121,8 +151,9 @@ describe('the harness files', () => {
 
 describe('one definition of done', () => {
   it('is pnpm check: typecheck, tests with coverage, then end-to-end tests', () => {
-    const check = scripts()['check'] ?? '';
-    for (const step of ['pnpm typecheck', 'pnpm coverage', 'pnpm e2e']) expect(check, step).toContain(step);
+    // In this order, each step only if the one before it passed.
+    const steps = (scripts()['check'] ?? '').split('&&').map((step) => step.trim());
+    expect(steps).toEqual(['pnpm typecheck', 'pnpm coverage', 'pnpm e2e']);
   });
 
   it('is what CI runs, and what a release waits for', () => {
@@ -180,9 +211,10 @@ describe('the documents', () => {
   });
 
   it('name only files and directories that are there', () => {
+    // A path Git ignores, such as the font cache, is made on a machine and is not in a checkout.
     const missing = documents().flatMap((document) =>
       namedPaths(read(document))
-        .filter((path) => !exists(path))
+        .filter((path) => !exists(path) && !ignored(path))
         .map((path) => `${document}: ${path}`),
     );
     expect(missing).toEqual([]);

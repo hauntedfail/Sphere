@@ -91,13 +91,18 @@ function cmapTable(file: Uint8Array): Uint8Array {
 
 /** Format 4: runs of characters in the Basic Multilingual Plane. */
 function readSegments(table: Uint8Array, start: number, into: Set<number>): void {
-  const reader = new Reader(table, start + 6);
-  const segmentCount = reader.u16() / 2;
+  const reader = new Reader(table, start + 2);
+  // The subtable's own length bounds every read: past it lie other subtables.
+  const end = start + reader.u16();
+  const at = (offset: number): number => {
+    if (offset + 2 > end) throw new Error('cmap format 4 reads past its subtable');
+    return new Reader(table, offset).u16();
+  };
+  const segmentCount = at(start + 6) / 2;
   const ends = start + 14;
   const starts = ends + segmentCount * 2 + 2;
   const deltas = starts + segmentCount * 2;
   const rangeOffsets = deltas + segmentCount * 2;
-  const at = (offset: number): number => new Reader(table, offset).u16();
 
   for (let segment = 0; segment < segmentCount; segment++) {
     const first = at(starts + segment * 2);
@@ -106,10 +111,9 @@ function readSegments(table: Uint8Array, start: number, into: Set<number>): void
     const rangeOffset = at(rangeOffsets + segment * 2);
     for (let point = first; point <= last && point < 0xffff; point++) {
       // Glyph 0 is the "missing" glyph: a character mapped to it is not held.
-      const glyph =
-        rangeOffset === 0
-          ? (point + delta) & 0xffff
-          : at(rangeOffsets + segment * 2 + rangeOffset + (point - first) * 2);
+      // A 0 in the glyph array stays missing; anything else still takes the delta.
+      const stored = rangeOffset === 0 ? point : at(rangeOffsets + segment * 2 + rangeOffset + (point - first) * 2);
+      const glyph = rangeOffset !== 0 && stored === 0 ? 0 : (stored + delta) & 0xffff;
       if (glyph !== 0) into.add(point);
     }
   }
@@ -131,7 +135,11 @@ function readGroups(table: Uint8Array, start: number, into: Set<number>): void {
 
 /** Every code point `file`, the bytes of a WOFF2 font, has a glyph for. */
 export function codePointsOf(file: Uint8Array): ReadonlySet<number> {
-  const table = cmapTable(file);
+  return cmapCodePoints(cmapTable(file));
+}
+
+/** Every code point a `cmap` table, as it is in the font, maps to a glyph. */
+export function cmapCodePoints(table: Uint8Array): ReadonlySet<number> {
   const header = new Reader(table, 2);
   const subtableCount = header.u16();
   const points = new Set<number>();

@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 /**
  * Not assertions: screenshots for reviewing the design by eye. Runs on the
@@ -14,6 +14,8 @@ test('screenshots', async ({ page }, info) => {
   const control = (key: string) => page.locator(`[data-key="${key}"]`);
 
   await page.goto(language === undefined ? '/' : `/?lang=${language}`);
+  // The dictionary of another language loads after the page does.
+  await expect(page.locator('main[data-mounted]')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(300);
   await shot('1-intro');

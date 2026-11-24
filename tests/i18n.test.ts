@@ -23,6 +23,11 @@ describe('resolveLocale', () => {
     [['zh-HK'], 'zh-Hant'],
     [['zh-MO'], 'zh-Hant'],
     [['zh-Hant-CN'], 'zh-Hant'],
+    // After `x` comes private use, not a script or a region.
+    [['zh-Hans-x-hant'], 'zh-Hans'],
+    [['zh-CN-x-tw'], 'zh-Hans'],
+    [['zh-x-hant'], 'zh-Hans'],
+    [['zh-TW-x-hans'], 'zh-Hant'],
     [['ko-KR'], 'ko'],
     [['ru'], 'ru'],
     [['it-CH'], 'it'],
