@@ -1,0 +1,81 @@
+{
+  "sources": {
+    "fusion-pixel-12": {
+      "url": "https://github.com/TakWolf/fusion-pixel-font/releases/download/2026.11.10/fusion-pixel-font-12px-proportional-otf.woff2-v2026.11.10.zip",
+      "sha256": "4a0bab32ebb6ca0525f87024f3adbacf409a74b0fc8373d5345c93b1b7cbb075",
+      "file": "fusion-pixel-12.zip"
+    },
+    "noto-sans-jp": {
+      "url": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
+      "sha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+      "file": "NotoSansJP.ttf"
+    },
+    "noto-sans-sc": {
+      "url": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+      "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+      "file": "NotoSansSC.ttf"
+    },
+    "noto-sans-tc": {
+      "url": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/notosanstc/NotoSansTC%5Bwght%5D.ttf",
+      "sha256": "864727d210d54f2537bbe23b3a839436c3992af72de9322af5270897246bd44f",
+      "file": "NotoSansTC.ttf"
+    },
+    "noto-sans-kr": {
+      "url": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf",
+      "sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "file": "NotoSansKR.ttf"
+    },
+    "geist": {
+      "url": "https://raw.githubusercontent.com/google/fonts/06bfe0d62a98375cb09c942fa18e68bd32cff057/ofl/geist/Geist%5Bwght%5D.ttf",
+      "sha256": "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659",
+      "file": "Geist.ttf"
+    }
+  },
+  "locales": {
+    "ja": {
+      "dots": {
+        "source": "fusion-pixel-12",
+        "member": "fusion-pixel-12px-proportional-ja.otf.woff2"
+      },
+      "text": {
+        "source": "noto-sans-jp"
+      }
+    },
+    "zh-Hans": {
+      "dots": {
+        "source": "fusion-pixel-12",
+        "member": "fusion-pixel-12px-proportional-zh_hans.otf.woff2"
+      },
+      "text": {
+        "source": "noto-sans-sc"
+      }
+    },
+    "zh-Hant": {
+      "dots": {
+        "source": "fusion-pixel-12",
+        "member": "fusion-pixel-12px-proportional-zh_tw.otf.woff2"
+      },
+      "text": {
+        "source": "noto-sans-tc"
+      }
+    },
+    "ko": {
+      "dots": {
+        "source": "fusion-pixel-12",
+        "member": "fusion-pixel-12px-proportional-ko.otf.woff2"
+      },
+      "text": {
+        "source": "noto-sans-kr"
+      }
+    },
+    "ru": {
+      "dots": {
+        "source": "fusion-pixel-12",
+        "member": "fusion-pixel-12px-proportional-latin.otf.woff2"
+      },
+      "text": {
+        "source": "geist"
+      }
+    }
+  }
+}

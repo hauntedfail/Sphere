@@ -25,6 +25,93 @@
   font-display: swap;
 }
 
+/*
+ * Doto and Instrument Sans are Latin faces. Each language written in another
+ * script brings two of its own, made by tools/fonts and holding only the
+ * characters its dictionary uses (docs/fonts.md):
+ *
+ *   Sphere Dots  a pixel face redrawn as round dots, to sit beside Doto
+ *   Sphere Text  a text face cut down, to sit beside Instrument Sans
+ *
+ * The Latin faces stay first in both stacks, so Latin letters and figures
+ * look the same in every language. Which pair follows them is decided by
+ * the language of the page, not by the character: Japanese and Chinese
+ * share code points and draw them differently. A browser fetches a face
+ * only when something on the page is set in it.
+ *
+ * The dot faces have one weight; the range below, and `font-synthesis` on
+ * the labels, stop a browser from thickening it into a bold of its own.
+ */
+@font-face {
+  font-family: 'Sphere Dots JA';
+  src: url('./assets/fonts/dots-ja.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text JA';
+  src: url('./assets/fonts/text-ja.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots ZH-HANS';
+  src: url('./assets/fonts/dots-zh-hans.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text ZH-HANS';
+  src: url('./assets/fonts/text-zh-hans.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots ZH-HANT';
+  src: url('./assets/fonts/dots-zh-hant.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text ZH-HANT';
+  src: url('./assets/fonts/text-zh-hant.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots KO';
+  src: url('./assets/fonts/dots-ko.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text KO';
+  src: url('./assets/fonts/text-ko.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Dots RU';
+  src: url('./assets/fonts/dots-ru.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sphere Text RU';
+  src: url('./assets/fonts/text-ru.woff2') format('woff2-variations');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
 :root {
   --void: #000000;
   --well: #0b0b0b;
@@ -39,6 +126,31 @@
   --sans: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   color-scheme: dark;
+}
+
+:root:lang(ja) {
+  --dots: 'Doto', 'Sphere Dots JA', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text JA', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(zh-Hans) {
+  --dots: 'Doto', 'Sphere Dots ZH-HANS', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text ZH-HANS', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(zh-Hant) {
+  --dots: 'Doto', 'Sphere Dots ZH-HANT', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text ZH-HANT', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(ko) {
+  --dots: 'Doto', 'Sphere Dots KO', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text KO', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+:root:lang(ru) {
+  --dots: 'Doto', 'Sphere Dots RU', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --sans: 'Instrument Sans', 'Sphere Text RU', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 *,
@@ -125,6 +237,7 @@ a {
   font-family: var(--dots);
   font-weight: 900;
   font-variation-settings: 'ROND' 100;
+  font-synthesis: none;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -162,6 +275,29 @@ main:focus {
 }
 
 /* ── Shell and top bar ──────────────────────────────────────────────────── */
+
+/*
+ * index.html is written in English. Until the script has drawn the page in
+ * the visitor's language (and removed `data-boot`), the English is kept out
+ * of sight, so that nobody watches one language turn into another.
+ *
+ * Without scripting nothing would ever uncover the page, so the rule applies
+ * only where scripts run. If the script fails to load, the page shows itself
+ * after a moment anyway. That is a safeguard, not motion, so it is kept when
+ * motion is turned down.
+ */
+@media (scripting: enabled) {
+  html[data-boot] .shell {
+    visibility: hidden;
+    animation: boot-reveal 0s linear 4s forwards !important;
+  }
+}
+
+@keyframes boot-reveal {
+  to {
+    visibility: visible;
+  }
+}
 
 .shell {
   max-width: 1180px;
@@ -242,6 +378,29 @@ main:focus {
   white-space: nowrap;
 }
 
+/*
+ * The language switch. Set in the system's own face: it lists every language
+ * under its own name, and no one language's font holds them all.
+ */
+.language {
+  /* May give way on a narrow screen: a long state beside it must not push it off the edge. */
+  flex: 0 1 auto;
+  min-width: 3.5em;
+  height: 28px;
+  max-width: 9.5em;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--void);
+  color: var(--mute);
+  font: 400 13px / 1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.language:hover,
+.language:focus-visible {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
 .pill::before {
   content: '';
   width: 7px;
@@ -287,12 +446,14 @@ main:focus {
   align-items: center;
   justify-content: center;
   min-height: 44px;
+  /* A label stays on one line while there is room; one longer than the screen breaks between words. */
+  max-width: 100%;
   padding: 0 18px;
   border: 1px solid var(--line-strong);
   background: var(--void);
   color: var(--ink);
   font-size: 14px;
-  white-space: nowrap;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -733,6 +894,7 @@ button.model-tile:hover {
 
 .battery {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   color: var(--mute);
@@ -1101,13 +1263,23 @@ button.model-tile:hover {
   }
 }
 
+/*
+ * The choices sit side by side, and go one under another where their words
+ * are too long for the row. The lines between them are the gaps, showing the
+ * ground behind, so they are right whichever way the choices fall.
+ */
 .segmented {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 1px;
+  max-width: 100%;
   border: 1px solid var(--line-strong);
+  background: var(--line-strong);
 }
 
 .segment {
+  flex: 1 1 auto;
   min-height: 38px;
   padding: 0 14px;
   border: 0;
@@ -1115,10 +1287,6 @@ button.model-tile:hover {
   color: var(--mute);
   font-size: 13px;
   cursor: pointer;
-}
-
-.segment + .segment {
-  border-left: 1px solid var(--line-strong);
 }
 
 .segment:hover {
@@ -1207,8 +1375,16 @@ button.model-tile:hover {
 /* ── Other widths ───────────────────────────────────────────────────────── */
 
 @media (max-width: 559px) {
+  .bar {
+    gap: 8px;
+  }
+
   .bar-device {
     display: none;
+  }
+
+  .language {
+    max-width: 7em;
   }
 
   .device-hero {

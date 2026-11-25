@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/app';
-import type { AppState } from '../src/app/state';
+import type { AppState, ConsoleLine } from '../src/app/state';
+import { ENGLISH, type I18n } from '../src/i18n/i18n';
+import { LOCALE_STORAGE_KEY, type Locale } from '../src/i18n/locales';
+import { render } from '../src/i18n/message';
 import { KNOWN_MODELS, modelFromLocalName } from '../src/protocol/model';
 import { STORAGE_KEY, type KeyValueStore } from '../src/storage/devices';
 import type {
@@ -628,5 +631,228 @@ describe('createSimulator', () => {
       expect(modelFromLocalName(simulator.open(model, {}).name)).toBe(model);
     }
     expect(modelFromLocalName(simulator.open('unknown', {}).name)).toBe('unknown');
+  });
+});
+
+describe('messages the page can translate', () => {
+  /** What the controls send, from src/ui/panes.ts, settings-pane.ts and view.ts. The empty line stops Find my IQOS. */
+  const CONTROL_LINES = [
+    'refresh',
+    'diagnosis',
+    'lock',
+    'unlock',
+    'brightness low',
+    'brightness high',
+    'smartgesture disable',
+    'smartgesture enable',
+    'flexpuff disable',
+    'flexpuff enable',
+    'autostart off',
+    'autostart on',
+    'flexbattery eco',
+    'flexbattery performance',
+    'flexbattery pause off',
+    'flexbattery pause on',
+    'vibration heating off',
+    'vibration heating on',
+    'device save desk',
+    'device remove desk',
+    'device remove desk',
+    'device save not a label',
+    'device save a!b',
+    'device save iluma-one',
+    'connect',
+    'connect --last',
+    'findmyiqos',
+    '',
+    'disconnect',
+    'disconnect',
+    'refresh',
+    'connect nowhere',
+  ];
+
+  /** The lines a command printed, apart from the echo of the command itself. */
+  const answers = (lines: readonly ConsoleLine[], from: number): ConsoleLine[] =>
+    lines.filter((line) => line.id > from && line.tone !== 'input' && line.text !== '');
+
+  const english = (line: ConsoleLine): string =>
+    line.message === undefined ? '' : render(ENGLISH.t, line.message);
+
+  it('come with every one-line answer to a control', async () => {
+    const h = await connected();
+    let checked = 0;
+    for (const line of CONTROL_LINES) {
+      const from = h.state().console.at(-1)?.id ?? 0;
+      await h.app.run(line);
+      await h.app.whenIdle();
+      // A refresh that goes well says nothing, and a diagnosis says several lines: neither is a toast.
+      const fresh = answers(h.state().console, from);
+      if (fresh.length !== 1) continue;
+      expect(fresh[0]?.message, `${line}: ${fresh[0]?.text}`).toBeDefined();
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(24);
+  });
+
+  it('say in English exactly what the line says', async () => {
+    const h = await connected();
+    for (const line of CONTROL_LINES) await h.app.run(line);
+    await h.app.whenIdle();
+    const keyed = h.state().console.filter((line) => line.message !== undefined);
+    expect(keyed.length).toBeGreaterThan(20);
+    for (const line of keyed) expect(line.text.replace(/^Error: /, '')).toBe(english(line));
+  });
+
+  it('come with the errors the app raises before there is a device', async () => {
+    const offline = harness(null);
+    await offline.app.run('connect');
+    const [failure] = answers(offline.state().console, 0);
+    expect(failure?.text).toMatch(/^Error: transport error: this browser has no Web Bluetooth/);
+    expect(english(failure as ConsoleLine)).toBe(failure?.text.replace(/^Error: /, ''));
+
+    const idle = harness();
+    await idle.app.run('battery');
+    const [refusal] = answers(idle.state().console, 0);
+    expect(refusal?.text).toBe('Not connected. Run connect, or demo to try a simulated device.');
+    expect(english(refusal as ConsoleLine)).toBe(refusal?.text);
+  });
+
+  it('come with a reading that failed, for the page to explain it', async () => {
+    const h = await connected();
+    h.bluetooth.device.silent = true;
+    await h.run('brightness');
+    const field = h.state().brightness;
+    expect(field.status).toBe('error');
+    if (field.status !== 'error') return;
+    expect(field.message).toBeDefined();
+    expect(field.message && render(ENGLISH.t, field.message)).toBe(field.error);
+  });
+
+  it('keep a device name that looks like a template as it is', async () => {
+    const h = harness();
+    h.bluetooth.options = { name: '{{x}} $t(page.lede)' };
+    await h.app.run('connect');
+    const greeting = h.state().console.find((line) => line.text.startsWith('Connected to'));
+    expect(greeting?.text).toContain('Connected to {{x}} $t(page.lede) (');
+    expect(english(greeting as ConsoleLine)).toBe(greeting?.text);
+  });
+});
+
+describe('choosing a language', () => {
+  /** Another language, as far as the app can tell: English words under another name. */
+  const speak = (locale: Locale): I18n => ({ ...ENGLISH, locale });
+  const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function speaking(load: (locale: Locale) => Promise<I18n> = async (locale) => speak(locale)) {
+    const storage = new MemoryStore();
+    const bluetooth = new FakeBluetooth();
+    const app = new App({
+      storage,
+      bluetooth,
+      version: '9.9.9',
+      simulator: createSimulator({ latencyMs: 0 }),
+      now: () => 1000,
+      loadI18n: load,
+    });
+    const locale = (): Locale => app.store.get().i18n.locale;
+    const printed = (): string[] => app.store.get().console.map((line) => line.text);
+    return { app, storage, bluetooth, locale, printed };
+  }
+
+  it('starts in the language it was given, English otherwise', () => {
+    expect(speaking().locale()).toBe('en');
+    const app = new App({ storage: new MemoryStore(), bluetooth: null, version: '1', i18n: speak('ko') });
+    expect(app.store.get().i18n.locale).toBe('ko');
+  });
+
+  it('switches, says so, and saves the choice', async () => {
+    const h = speaking();
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.printed()).toEqual(['iqos> lang ja', 'Language: 日本語']);
+    expect(h.storage.data.get(LOCALE_STORAGE_KEY)).toBe('ja');
+  });
+
+  it('answers a bare lang with the language in use', async () => {
+    const h = speaking();
+    await h.app.run('lang');
+    expect(h.printed()).toEqual(['iqos> lang', 'Language: English']);
+    expect(h.storage.data.has(LOCALE_STORAGE_KEY)).toBe(false);
+  });
+
+  it('refuses a code it does not know and stays as it was', async () => {
+    const h = speaking();
+    await h.app.run('lang xx');
+    expect(h.locale()).toBe('en');
+    expect(h.printed().at(-1)).toBe('Usage: lang [en|ja|zh-Hans|zh-Hant|ko|ru|it]');
+  });
+
+  it('does not count as busy, so no control waits on it', async () => {
+    const h = speaking();
+    const switching = h.app.run('lang ja');
+    expect(h.app.store.get().busy).toBe(0);
+    await switching;
+    expect(h.app.store.get().busy).toBe(0);
+  });
+
+  it('switches at once, ahead of a queue that is waiting on the device', async () => {
+    const h = speaking();
+    h.bluetooth.options = { latencyMs: 40 };
+    await h.app.run('connect');
+    void h.app.run('battery');
+    void h.app.run('battery');
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.app.store.get().busy).toBeGreaterThan(0);
+    await h.app.whenIdle();
+  });
+
+  it('does not stop Find my IQOS', async () => {
+    const h = speaking();
+    await h.app.run('connect');
+    await h.app.run('findmyiqos');
+    expect(h.app.store.get().finding).toBe(true);
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.app.store.get().finding).toBe(true);
+    await h.app.run('');
+  });
+
+  it('keeps the language, and says why, when the dictionary cannot be loaded', async () => {
+    const h = speaking(() => Promise.reject(new Error('offline')));
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('en');
+    const failure = h.app.store.get().console.at(-1);
+    expect(failure?.tone).toBe('error');
+    expect(failure?.text).toBe('Error: transport error: could not load 日本語. The page stays as it is.');
+    expect(failure?.message).toBeDefined();
+    expect(h.storage.data.has(LOCALE_STORAGE_KEY)).toBe(false);
+  });
+
+  it('ends on the last language chosen, however long an earlier one takes to load', async () => {
+    const h = speaking(async (locale) => {
+      if (locale === 'ja') await pause(30);
+      return speak(locale);
+    });
+    const slow = h.app.run('lang ja');
+    const quick = h.app.run('lang ko');
+    await Promise.all([slow, quick]);
+    expect(h.locale()).toBe('ko');
+    expect(h.storage.data.get(LOCALE_STORAGE_KEY)).toBe('ko');
+    expect(h.printed().filter((line) => line.startsWith('Language:'))).toEqual(['Language: 한국어']);
+  });
+
+  it('switches even when the browser refuses to store the choice', async () => {
+    const h = speaking();
+    h.storage.failing = true;
+    await h.app.run('lang ja');
+    expect(h.locale()).toBe('ja');
+    expect(h.printed()).toContain('Could not write to browser storage; the change lasts until this tab closes.');
+  });
+
+  it('lists lang in help', async () => {
+    const h = speaking();
+    await h.app.run('help');
+    expect(h.printed().join('\n')).toMatch(/^ {2}lang \[code\]\s+Choose the language of the page$/m);
   });
 });

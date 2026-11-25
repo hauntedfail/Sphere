@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommand } from '../src/console/parse';
+import { COMMAND_NAMES, parseCommand } from '../src/console/parse';
 import { describeError, SphereError } from '../src/protocol/errors';
 import {
   EMPTY_BOOK,
@@ -287,5 +287,25 @@ describe('describeError', () => {
     expect(describeError(new SphereError('usage', 'x'))).toBe('x');
     expect(describeError(new Error('plain'))).toBe('plain');
     expect(describeError('text')).toBe('text');
+  });
+});
+
+describe('lang', () => {
+  it('asks for the language in use, or chooses one by its code', () => {
+    expect(parseCommand('lang')).toEqual({ name: 'lang' });
+    expect(parseCommand('lang ja')).toEqual({ name: 'lang', locale: 'ja' });
+    expect(parseCommand('LANG zh-hant')).toEqual({ name: 'lang', locale: 'zh-Hant' });
+  });
+
+  it('refuses a code the page does not speak, and more than one code', () => {
+    const usage = 'Usage: lang [en|ja|zh-Hans|zh-Hant|ko|ru|it]';
+    expect(() => parseCommand('lang xx')).toThrow(usage);
+    expect(() => parseCommand('lang ja-JP')).toThrow(usage);
+    expect(() => parseCommand('lang ja ko')).toThrow(usage);
+  });
+
+  it('is a command like the others', () => {
+    expect(COMMAND_NAMES).toContain('lang');
+    expect([...COMMAND_NAMES].sort()).toEqual(COMMAND_NAMES);
   });
 });

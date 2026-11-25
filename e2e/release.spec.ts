@@ -132,3 +132,130 @@ test('serves the picture that link previews show', async ({ page }) => {
   expect(response.ok()).toBe(true);
   expect(response.headers()['content-type']).toBe('image/png');
 });
+
+test('a visitor can choose a language and find it again', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await page.locator('#language').selectOption('ja');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('#language')).toHaveValue('ja');
+});
+
+test('?lang= opens the page in that language without saving it', async ({ page }) => {
+  await page.goto('/?lang=ko');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
+  await expect(page.locator('#language')).toHaveValue('ko');
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('a choice made on the page outlives the ?lang= it was opened with', async ({ page }) => {
+  await page.goto('/?lang=ko');
+  await page.locator('#language').selectOption('it');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'it');
+  expect(new URL(page.url()).search).toBe('');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'it');
+});
+
+test('the page is covered until it is drawn, then shown', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('main[data-mounted]')).toBeVisible();
+  await expect(page.locator('html')).not.toHaveAttribute('data-boot');
+  await expect(page.locator('.lede')).toBeVisible();
+});
+
+test('the page can be read without JavaScript', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, ...(baseURL ? { baseURL } : {}) });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('.lede')).toBeVisible();
+  await context.close();
+});
+
+test('the page shows itself even if its script never runs', async ({ page, problems }) => {
+  await page.route('**/*.js', (route) => route.abort());
+  await page.goto('/');
+  await expect(page.locator('.lede')).toBeHidden();
+  await expect(page.locator('.lede')).toBeVisible({ timeout: 8000 });
+  // The browser reports the script it was refused; that is this test's own doing.
+  problems.length = 0;
+});
+
+test('fetches a dictionary only for the language it is shown in', async ({ page }) => {
+  const scripts = async (path: string): Promise<string[]> => {
+    const seen: string[] = [];
+    const listen = (request: { url(): string; resourceType(): string }): void => {
+      if (request.resourceType() === 'script') seen.push(new URL(request.url()).pathname);
+    };
+    page.on('request', listen);
+    await page.goto(path);
+    await expect(page.locator('main[data-mounted]')).toBeVisible();
+    page.off('request', listen);
+    return seen;
+  };
+
+  const english = await scripts('/');
+  const japanese = await scripts('/?lang=ja');
+  expect(japanese.length).toBe(english.length + 1);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('.lede')).toContainText('IQOS ILUMA を設定できます');
+  await expect(page.locator('#connect-button')).toHaveText('デバイスを接続');
+});
+
+test('fetches the fonts of a language only when the page is in it', async ({ page }) => {
+  const fonts = async (path: string): Promise<string[]> => {
+    const seen: string[] = [];
+    const listen = (request: { url(): string; resourceType(): string }): void => {
+      if (request.resourceType() === 'font') seen.push(new URL(request.url()).pathname.split('/').pop() ?? '');
+    };
+    page.on('request', listen);
+    await page.goto(path);
+    await expect(page.locator('main[data-mounted]')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    page.off('request', listen);
+    return seen;
+  };
+
+  const english = await fonts('/');
+  expect(english.some((name) => /^(dots|text)-/.test(name)), english.join(' ')).toBe(false);
+
+  const japanese = await fonts('/?lang=ja');
+  expect(japanese.some((name) => name.startsWith('dots-ja')), japanese.join(' ')).toBe(true);
+  expect(japanese.some((name) => name.startsWith('text-ja')), japanese.join(' ')).toBe(true);
+  await expectNoSidewaysScroll(page);
+});
+
+for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
+  test(`${locale}: the page is in that language and fits the screen`, async ({ page, baseURL }) => {
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await page.goto(`/?lang=${locale}`);
+    await expect(page.locator('html')).toHaveAttribute('lang', locale);
+    await expect(page.locator('#language')).toHaveValue(locale);
+    await expect(page.locator('#connect-button')).not.toHaveText('Connect a device');
+    await page.evaluate(() => document.fonts.ready);
+    for (const url of requests) expect(url.startsWith(baseURL ?? ''), url).toBe(true);
+    await expectNoSidewaysScroll(page);
+  });
+}
+
+test('opens in English when the dictionary asked for cannot be fetched', async ({ page, problems }) => {
+  // What a visitor meets just after a deploy has replaced the files, or with the network gone.
+  let refused = 0;
+  await page.route(/\/assets\/ja-[^/]+\.js$/, (route) => {
+    refused++;
+    return route.abort();
+  });
+  await page.goto('/?lang=ja');
+  await expect(page.locator('main[data-mounted]')).toBeVisible();
+  expect(refused).toBeGreaterThan(0);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('#language')).toHaveValue('en');
+  await expect(page.locator('#connect-button')).toHaveText('Connect a device');
+  await expect(page.locator('.lede')).toBeVisible();
+  // The browser reports the script it was refused; that is this test's own doing.
+  problems.length = 0;
+});

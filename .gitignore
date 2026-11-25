@@ -7,3 +7,7 @@ e2e/.shots/
 .DS_Store
 *.local
 .wrangler/
+tools/fonts/.cache/
+tools/fonts/chars.json
+__pycache__/
+.pytest_cache/

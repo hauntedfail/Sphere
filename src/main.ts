@@ -1,5 +1,7 @@
 import './styles.css';
 import { App } from './app/app';
+import { bootI18n } from './i18n/i18n';
+import { LOCALE_PARAMETER, LOCALE_STORAGE_KEY } from './i18n/locales';
 import type { KeyValueStore } from './storage/devices';
 import { createBluetoothGateway } from './transport/web-bluetooth';
 import { mount } from './ui/view';
@@ -24,11 +26,22 @@ function openStorage(): KeyValueStore {
 // of the build at all. Where it is true the simulator loads as its own chunk.
 const simulator = __SIMULATOR__ ? (await import('./transport/simulator')).createSimulator() : null;
 
+const storage = openStorage();
+
+// The address asks first (`?lang=ja`), then what was chosen here before, then
+// the browser. Opening the page from a link does not save that link's language.
+const i18n = await bootI18n({
+  query: new URLSearchParams(window.location.search).get(LOCALE_PARAMETER),
+  saved: storage.getItem(LOCALE_STORAGE_KEY),
+  preferred: navigator.languages ?? [],
+});
+
 const app = new App({
-  storage: openStorage(),
+  storage,
   bluetooth: createBluetoothGateway(),
   simulator,
   version: __APP_VERSION__,
+  i18n,
 });
 
 mount(app);

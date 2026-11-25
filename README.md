@@ -47,6 +47,15 @@ Connected, the page shows the device and its settings.
   until you choose, then show what was last set here.
 - **Supported models** on the start page shows each model's drawing.
 
+**Languages.** The page speaks English, Japanese, Chinese (simplified and
+traditional), Korean, Russian and Italian. It opens in the browser's language
+when it has it and in English otherwise; the switch in the top bar changes it
+and the choice is kept. A link can ask for one: `?lang=ja`, with the codes
+`en`, `ja`, `zh-Hans`, `zh-Hant`, `ko`, `ru` and `it`. Link previews and search
+results stay English, because the address is the same for every language.
+The translations have not been read by native speakers yet
+([Backlog](Backlog.md)).
+
 The outcome of a click appears as a short notice at the bottom of the page.
 There is no console. For a bug report, **Details → Copy session log** copies
 what each control sent and every frame that came back.
@@ -88,6 +97,7 @@ connect buttons and the model tiles run):
 | `model <model>` | Say which model this is when its name does not |
 | `refresh` | Read every setting again |
 | `disconnect`, `exit`, `quit` | Close the connection |
+| `lang [code]` | Show the page's language, or choose one |
 | `clear` | Clear the recorded output |
 
 ### Differences from the CLI
@@ -114,14 +124,17 @@ connect buttons and the model tiles run):
 ## Privacy and security
 
 - **No network.** The built page ships a Content-Security-Policy with
-  `default-src 'none'` and `connect-src 'none'`. Scripts, styles and the one
-  font come from the page's own origin; nothing else loads, and `fetch` is
-  blocked by the browser. An end-to-end test asserts this.
-- **No third-party code at runtime.** `package.json` has development
-  dependencies only. The bundle is this repository's code.
-- **Little is stored.** `localStorage` holds saved labels and the last device:
-  a browser-scoped id, the advertised name and the model. Serial numbers,
-  product numbers, usage counters and the session log are never written.
+  `default-src 'none'` and `connect-src 'none'`. Scripts, styles and fonts
+  come from the page's own origin; nothing else loads, and `fetch` is blocked
+  by the browser. An end-to-end test asserts this, in every language.
+- **One third-party library at runtime.** [i18next](https://www.i18next.com/)
+  looks up the page's words. It has no dependencies of its own and touches
+  neither the network nor the page; a test holds `package.json` to that one
+  name. Everything else in the bundle is this repository's code.
+- **Little is stored.** `localStorage` holds saved labels, the last device (a
+  browser-scoped id, the advertised name and the model) and the language you
+  chose. Serial numbers, product numbers, usage counters and the session log
+  are never written.
 - **Nothing a device says becomes markup.** All text reaches the page as text
   nodes; the policy also sets `require-trusted-types-for 'script'`, so an
   `innerHTML` slipping in later would fail loudly.
@@ -225,20 +238,39 @@ src/
   console/     the command grammar the controls speak
   storage/     saved device labels
   app/         connection lifecycle, command queue, immutable state store
+  i18n/        the languages: which one to use, and a dictionary for each.
+               Touches no DOM; i18next is used here and nowhere else
   ui/          DOM rendering; reads state, calls app.run(line)
                view.ts     binds the page: notices, focus, redraws
-               panes.ts    device card and settings, state in, nodes out
+               panes.ts    the device card and the start page's lists,
+                           state in, nodes out
+               settings-pane.ts  each setting: picture, guide, controls
+               pane-parts.ts     the rows, switches and choices they share
                dots.ts     dot-matrix screens and the timer that moves them
                scenes.ts   the pictures: globe, each model, each setting
                log.ts      the session log as text
+               static.ts   the words written into index.html
+               language.ts the language switch
+tools/fonts/   makes the fonts for languages not written in Latin letters
 ```
 
 Every control goes through one path, `app.run(line)`, so each action has a
 single implementation. Nothing above `ui/` touches the DOM.
 
-TypeScript, Vite, no framework and no runtime dependencies. The production
-build is about 21 kB of JavaScript and 4 kB of CSS gzipped, plus two fonts
-(36 kB together), all served from the page's own origin.
+TypeScript, Vite, no framework and one runtime dependency, i18next. The
+production build is about 42 kB of JavaScript and 4 kB of CSS gzipped, plus
+two fonts (36 kB together), all served from the page's own origin. That is
+what an English or Italian visitor loads. Another language adds its
+dictionary (about 5 kB gzipped) and its two fonts: 8 kB for Russian, 43 kB
+for Korean, 76 kB for Japanese, 98 kB for simplified and 115 kB for
+traditional Chinese.
+
+The words live in `src/i18n/messages/`, one file a language, checked against
+the English one for the same keys and parameters. A line the page shows in a
+notice carries its message as well as its English text, so the notice is in
+the page's language while the session log stays English. The fonts for each
+language hold only the characters its dictionary uses; [docs/fonts.md](docs/fonts.md)
+says how they are made and when to rebuild them.
 
 The stylesheet's opening comment describes the visual system: black, white
 and one red; square edges throughout; a dot-matrix face for names, figures and
@@ -277,6 +309,9 @@ What the tests establish:
 - In a real browser, on desktop and phone viewports: the security policy
   holds, no request leaves the origin, and stored or typed text is never
   rendered as markup. The device flows run by mouse and by keyboard.
+- Every language has every message, with the same parameters, and its fonts
+  hold every character it uses. In a real browser each language fits the
+  screen, and changing language keeps the device connected.
 
 The guides describe the settings as IQOS's own published help describes them
 (session counts, the eight-minute pause, up to four extra puffs). Those
@@ -302,8 +337,10 @@ Sphere is free software under the [GNU General Public License v3.0](LICENSE).
 Its protocol layer is a port of the GPL-3.0 [`iqos`](https://github.com/V-VX/iqos)
 crate, and its command set follows [`iqos_cli`](https://github.com/V-VX/iqos_cli).
 
-Two typefaces ship with the site: *Doto* (names, figures and labels) and
-*Instrument Sans* (sentences), both under the SIL Open Font License 1.1. Their
+Two typefaces set the Latin text: *Doto* (names, figures and labels) and
+*Instrument Sans* (sentences). The other scripts use faces made for Sphere
+from *Fusion Pixel* (labels, redrawn as dots), *Noto Sans* JP, SC, TC and KR,
+and *Geist* (sentences). All are under the SIL Open Font License 1.1. Their
 licences are in [`public/font-license.txt`](public/font-license.txt), which
 ships with the site and is linked from the page footer.
 

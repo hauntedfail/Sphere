@@ -1,10 +1,13 @@
 /** What each console command does. Output follows the `iqos` CLI. */
 import type { Command, DeviceAction, ToggleAction, VibrationChanges } from '../console/parse';
-import { describeError, usageError } from '../protocol/errors';
+import type { MessageRef } from '../i18n/message';
+import type { MessageKey } from '../i18n/messages/en';
+import { usageError } from '../protocol/errors';
 import { supports } from '../protocol/model';
 import type { VibrationSettings } from '../protocol/vibration';
 import { withDevice, withoutDevice } from '../storage/devices';
 import type { App, FieldKey, FieldValue, Session } from './app';
+import { appError, errorRef } from './messages';
 import {
   enabledText,
   formatDiagnosis,
@@ -14,6 +17,9 @@ import {
   formatVibration,
   helpLines,
 } from './format';
+
+/** `enabled` or `disabled`, as a value inside an answer. */
+const enabledRef = (value: boolean): MessageRef => ({ key: value ? 'value.enabled' : 'value.disabled' });
 
 export async function runCommand(app: App, command: Command): Promise<void> {
   switch (command.name) {
@@ -36,6 +42,8 @@ export async function runCommand(app: App, command: Command): Promise<void> {
       return;
     case 'model':
       return app.setModel(command.model);
+    case 'lang':
+      return command.locale === undefined ? app.sayLanguage() : app.setLocale(command.locale);
     case 'device':
       return device(app, command.action);
     case 'refresh':
@@ -74,24 +82,24 @@ export async function runCommand(app: App, command: Command): Promise<void> {
  */
 export async function refreshDevice(app: App): Promise<void> {
   const { iqos, link } = app.session();
-  const reads: [string, () => Promise<unknown>][] = [
-    ['battery level', () => app.load('battery', () => link.readBatteryLevel())],
-    ['device information', () => app.load('status', () => iqos.readStatus())],
+  const reads: [MessageKey, () => Promise<unknown>][] = [
+    ['reading.battery', () => app.load('battery', () => link.readBatteryLevel())],
+    ['reading.status', () => app.load('status', () => iqos.readStatus())],
   ];
   if (iqos.supports('brightness')) {
-    reads.push(['brightness', () => app.load('brightness', () => iqos.readBrightness())]);
+    reads.push(['reading.brightness', () => app.load('brightness', () => iqos.readBrightness())]);
   }
   if (iqos.supports('vibration')) {
-    reads.push(['vibration', () => app.load('vibration', () => iqos.readVibration())]);
+    reads.push(['reading.vibration', () => app.load('vibration', () => iqos.readVibration())]);
   }
   if (iqos.supports('flexpuff')) {
-    reads.push(['FlexPuff', () => app.load('flexpuff', () => iqos.readFlexpuff())]);
+    reads.push(['reading.flexpuff', () => app.load('flexpuff', () => iqos.readFlexpuff())]);
   }
   if (iqos.supports('flexbattery')) {
-    reads.push(['FlexBattery', () => app.load('flexbattery', () => iqos.readFlexbattery())]);
+    reads.push(['reading.flexbattery', () => app.load('flexbattery', () => iqos.readFlexbattery())]);
   }
   if (iqos.supports('autostart')) {
-    reads.push(['Auto Start', () => app.load('autostart', () => iqos.readAutostart())]);
+    reads.push(['reading.autostart', () => app.load('autostart', () => iqos.readAutostart())]);
   }
 
   for (const [name, read] of reads) {
@@ -99,7 +107,7 @@ export async function refreshDevice(app: App): Promise<void> {
     try {
       await read();
     } catch (error) {
-      app.print(`Could not read ${name}: ${describeError(error)}`, 'note');
+      app.say({ key: 'result.couldNotRead', params: { name: { key: name }, detail: errorRef(error) } }, 'note');
     }
   }
 }
@@ -117,7 +125,7 @@ async function readBack<K extends FieldKey>(
   try {
     return await app.load(key, read);
   } catch (error) {
-    app.print(`Written, but reading it back failed: ${describeError(error)}`, 'note');
+    app.say({ key: 'result.readBackFailed', params: { detail: errorRef(error) } }, 'note');
     return undefined;
   }
 }
@@ -125,7 +133,7 @@ async function readBack<K extends FieldKey>(
 async function battery(app: App): Promise<void> {
   const { link } = app.session();
   const level = await app.load('battery', () => link.readBatteryLevel());
-  app.print(`Battery: ${level}%`);
+  app.say({ key: 'result.battery', params: { level } });
 }
 
 async function info(app: App): Promise<void> {
@@ -144,12 +152,12 @@ async function lock(app: App, locked: boolean): Promise<void> {
   const { iqos, device } = app.session();
   await (locked ? iqos.lock() : iqos.unlock());
   app.patchDevice(device, (state) => ({ ...state, locked }));
-  app.print(locked ? 'Device locked' : 'Device unlocked');
+  app.say({ key: locked ? 'result.locked' : 'result.unlocked' });
 }
 
 async function findMyIqos(app: App): Promise<void> {
   const { iqos, device } = app.session();
-  app.print('Starting Find My IQOS...');
+  app.say({ key: 'result.findStarting' });
   await iqos.findStart();
   app.patchDevice(device, (state) => ({ ...state, finding: true }));
   if (app.store.get().finding) app.print('Press <Enter> to stop');
@@ -157,24 +165,24 @@ async function findMyIqos(app: App): Promise<void> {
 
 async function brightness(app: App, level: 'high' | 'low' | undefined): Promise<void> {
   const { iqos } = app.session();
-  if (!iqos.supports('brightness')) return app.print('Brightness not supported on this device');
+  if (!iqos.supports('brightness')) return app.say({ key: 'result.brightnessUnsupported' });
 
   if (level === undefined) {
     const current = await app.load('brightness', () => iqos.readBrightness());
-    return app.print(`Brightness: ${current}`);
+    return app.say({ key: 'result.brightness', params: { level: { key: `value.${current}` } } });
   }
   await iqos.setBrightness(level);
-  app.print(`Brightness set to ${level}`);
+  app.say({ key: 'result.brightnessSet', params: { level: { key: `value.${level}` } } });
   const actual = await readBack(app, 'brightness', () => iqos.readBrightness());
   if (actual !== undefined && actual !== level) {
-    app.print(`The device still reports ${actual}.`, 'note');
+    app.say({ key: 'result.stillReports', params: { level: { key: `value.${actual}` } } }, 'note');
   }
 }
 
 async function vibration(app: App, changes: VibrationChanges | undefined): Promise<void> {
   const session = app.session();
   const { iqos } = session;
-  if (!iqos.supports('vibration')) return app.print('Vibration is not supported on this device');
+  if (!iqos.supports('vibration')) return app.say({ key: 'result.vibrationUnsupported' });
 
   if (changes === undefined) {
     const current = await app.load('vibration', () => iqos.readVibration());
@@ -187,7 +195,7 @@ async function vibration(app: App, changes: VibrationChanges | undefined): Promi
   const current = await app.load('vibration', () => iqos.readVibration());
   const next = applyVibrationChanges(current, changes, session);
   await iqos.updateVibration(next);
-  app.print('Vibration settings updated');
+  app.say({ key: 'result.vibrationUpdated' });
   await readBack(app, 'vibration', () => iqos.readVibration());
 }
 
@@ -209,38 +217,38 @@ function applyVibrationChanges(
 
 async function flexpuff(app: App, action: ToggleAction): Promise<void> {
   const { iqos } = app.session();
-  if (!iqos.supports('flexpuff')) return app.print('FlexPuff is not supported on this device');
+  if (!iqos.supports('flexpuff')) return app.say({ key: 'result.flexpuffUnsupported' });
 
   if (action === 'status') {
     const enabled = await app.load('flexpuff', () => iqos.readFlexpuff());
     return app.print(`FlexPuff: ${enabledText(enabled)}`);
   }
   await iqos.setFlexpuff(action === 'enable');
-  app.print(`FlexPuff ${enabledText(action === 'enable')}`);
+  app.say({ key: 'result.flexpuffSet', params: { state: enabledRef(action === 'enable') } });
   await readBack(app, 'flexpuff', () => iqos.readFlexpuff());
 }
 
 async function autostart(app: App, action: ToggleAction): Promise<void> {
   const { iqos } = app.session();
-  if (!iqos.supports('autostart')) return app.print('AutoStart is not supported on this device');
+  if (!iqos.supports('autostart')) return app.say({ key: 'result.autostartUnsupported' });
 
   if (action === 'status') {
     const enabled = await app.load('autostart', () => iqos.readAutostart());
     return app.print(`Autostart: ${enabledText(enabled)}`);
   }
   await iqos.setAutostart(action === 'enable');
-  app.print(`Autostart ${enabledText(action === 'enable')}`);
+  app.say({ key: 'result.autostartSet', params: { state: enabledRef(action === 'enable') } });
   await readBack(app, 'autostart', () => iqos.readAutostart());
 }
 
 async function smartGesture(app: App, enabled: boolean): Promise<void> {
   const { iqos, device } = app.session();
   if (!iqos.supports('smartgesture')) {
-    return app.print('SmartGesture is not supported on this device');
+    return app.say({ key: 'result.gestureUnsupported' });
   }
   await iqos.setSmartGesture(enabled);
   app.patchDevice(device, (state) => ({ ...state, smartGesture: enabled }));
-  app.print(`Smart Gesture ${enabledText(enabled)}`);
+  app.say({ key: 'result.gestureSet', params: { state: enabledRef(enabled) } });
 }
 
 async function flexbattery(
@@ -250,7 +258,7 @@ async function flexbattery(
 ): Promise<void> {
   const { iqos } = app.session();
   if (!iqos.supports('flexbattery')) {
-    return app.print('FlexBattery is only available on ILUMA i and ILUMA i PRIME devices');
+    return app.say({ key: 'result.flexbatteryUnsupported' });
   }
 
   if (mode === undefined && pause === undefined) {
@@ -261,7 +269,7 @@ async function flexbattery(
   // current mode is read first and sent back unchanged.
   const target = mode ?? (await app.load('flexbattery', () => iqos.readFlexbattery())).mode;
   await iqos.setFlexbattery({ mode: target, ...(pause === undefined ? {} : { pause }) });
-  app.print('FlexBattery settings updated');
+  app.say({ key: 'result.flexbatteryUpdated' });
   await readBack(app, 'flexbattery', () => iqos.readFlexbattery());
 }
 
@@ -274,17 +282,19 @@ function device(app: App, action: DeviceAction): void {
       const connected = app.store.get().device;
       if (connected === null) throw usageError('No connected device metadata available');
       if (connected.kind === 'simulated') {
-        throw usageError('The simulated device cannot be saved.');
+        throw appError('usage', { key: 'error.simulatedNotSaved' });
       }
       const saved = { id: connected.id, name: connected.name, model: connected.model };
       app.setBook(withDevice(book, action.label, saved));
-      return app.print(`Saved device label: ${action.label.trim()}`);
+      return app.say({ key: 'result.labelSaved', params: { label: action.label.trim() } });
     }
     case 'remove': {
       const next = withoutDevice(book, action.label);
-      if (next === null) throw usageError(`Device label not found: ${action.label.trim()}`);
+      if (next === null) {
+        throw appError('usage', { key: 'error.labelNotFound', params: { label: action.label.trim() } });
+      }
       app.setBook(next);
-      return app.print(`Removed device label: ${action.label.trim()}`);
+      return app.say({ key: 'result.labelRemoved', params: { label: action.label.trim() } });
     }
   }
 }

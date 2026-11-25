@@ -175,3 +175,65 @@ test('keeps the simulator when the browser has no Web Bluetooth', async ({ page 
   await page.getByRole('button', { name: 'Try a simulated device' }).click();
   await expect(page.locator('#title-state')).toHaveText('ready');
 });
+
+test('changing the language keeps the device connected', async ({ page }) => {
+  await connectSimulator(page);
+  const level = await page.locator('#battery-level').textContent();
+  await page.locator('#language').selectOption('ja');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('#battery-level')).toHaveText(level ?? '');
+  await expect(page.locator('#device-pane [data-key="disconnect"]')).toBeVisible();
+  await expect(toasts(page)).toBeEmpty();
+});
+
+for (const locale of ['ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
+  test(`${locale}: the connected page fits the screen`, async ({ page }) => {
+    await page.goto(`/?lang=${locale}`);
+    await page.locator('#demo-button').click();
+    await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
+    await page.evaluate(() => document.fonts.ready);
+    await expectNoSidewaysScroll(page);
+    await page.locator('[data-key="details-summary"]').click();
+    await expectNoSidewaysScroll(page);
+  });
+}
+
+/** Elements that reach past the right edge of the screen, apart from what sits in a box that scrolls. */
+function pastTheEdge(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const edge = document.documentElement.clientWidth;
+    return [...document.querySelectorAll('.shell *')]
+      .filter((element) => element.closest('.table-scroll') === null)
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        return box.width > 0 && box.right > edge + 0.5;
+      })
+      .map((element) => `${element.tagName.toLowerCase()}${element.id === '' ? '' : `#${element.id}`}.${element.className}`);
+  });
+}
+
+for (const locale of ['en', 'ja', 'zh-Hans', 'zh-Hant', 'ko', 'ru', 'it']) {
+  test(`${locale}: everything stays inside a 320px screen`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto(`/?lang=${locale}`);
+    await expect(page.locator('main[data-mounted]')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    expect(await pastTheEdge(page), 'on the start page').toEqual([]);
+
+    await page.locator('#demo-button').click();
+    await expect(page.locator('#title-state')).toHaveAttribute('data-state', 'ready');
+    await page.evaluate(() => document.fonts.ready);
+    expect(await pastTheEdge(page), 'connected').toEqual([]);
+
+    // A set of choices must also stay inside its own row, not only inside the screen.
+    const choices = await page.evaluate(() =>
+      [...document.querySelectorAll('.segmented')].map((element) =>
+        Math.round(
+          element.getBoundingClientRect().right - (element.closest('.row') as Element).getBoundingClientRect().right,
+        ),
+      ),
+    );
+    expect(Math.max(...choices), 'choices past the edge of their row, px').toBeLessThanOrEqual(0);
+  });
+}

@@ -1,33 +1,29 @@
 /** Binds the page to the app: draws state, forwards input. */
 import type { App } from '../app/app';
 import type { AppState, ConsoleLine } from '../app/state';
+import type { Translate } from '../i18n/i18n';
+import { type MessageRef, render } from '../i18n/message';
+import type { MessageKey } from '../i18n/messages/en';
 import { modelLabel } from '../protocol/model';
 import { byId, h, redraw } from './dom';
+import { bindLanguage, dropLanguageParameter } from './language';
 import { createStage } from './dots';
 import { sessionLog } from './log';
-import {
-  commitMemory,
-  createPaneUi,
-  devicePane,
-  modelTiles,
-  resetPaneUi,
-  saveForm,
-  savedDevices,
-  settingsPane,
-} from './panes';
+import { commitMemory, createPaneUi, resetPaneUi } from './pane-parts';
+import { devicePane, modelTiles, saveForm, savedDevices } from './panes';
 import { GLOBE_SIZE, globeScene } from './scenes';
+import { settingsPane } from './settings-pane';
+import { applyStaticText } from './static';
 
-const SUPPORT_NOTICE: Record<AppState['support'], string> = {
-  ok: '',
-  unsupported:
-    'This browser has no Web Bluetooth, so it cannot reach a device. Use Chrome, Edge or Opera on desktop or Android. On an iPhone or iPad, use Bluefy.',
-  insecure: 'Bluetooth only works on a secure page. Open Sphere over HTTPS or from localhost.',
+/** What to say where Bluetooth cannot be used. `null` where it can. */
+const SUPPORT_NOTICE: Record<AppState['support'], MessageKey | null> = {
+  ok: null,
+  unsupported: 'notice.unsupported',
+  insecure: 'notice.insecure',
 };
-/** Added to a support notice in builds that carry the simulator. */
-const SIMULATOR_STILL_WORKS = ' The simulated device still works here.';
 
 /** Which parts of the state each region depends on. */
-const DEVICE_KEYS = ['device', 'battery', 'status', 'diagnosis', 'finding'] as const;
+const DEVICE_KEYS = ['device', 'battery', 'status', 'diagnosis', 'finding', 'i18n'] as const;
 const SETTINGS_KEYS = [
   'device',
   'brightness',
@@ -38,28 +34,46 @@ const SETTINGS_KEYS = [
   'smartGesture',
   'locked',
   'finding',
+  'i18n',
 ] as const;
 
 const TOAST_MS = 3600;
 /** Wide enough for the device card and the settings to sit side by side. */
 const WIDE_LAYOUT = '(min-width: 960px)';
 
+/**
+ * Whether a console line is about choosing the page's language. Such a line
+ * is printed beside the command queue, so it can land among the answers to a
+ * command that is still running. It is not one of them.
+ */
+function aboutLanguage(line: ConsoleLine): boolean {
+  const message = line.message;
+  if (message === undefined) return false;
+  if (message.key === 'result.language') return true;
+  const detail = message.params?.['detail'];
+  return typeof detail === 'object' && (detail as MessageRef).key === 'error.languageUnavailable';
+}
+
 function changed(state: AppState, previous: AppState | null, keys: readonly (keyof AppState)[]): boolean {
   return previous === null || keys.some((key) => state[key] !== previous[key]);
 }
 
-function titleState(state: AppState): string {
+type TitleState = 'connecting' | 'vibrating' | 'working' | 'ready' | 'idle';
+
+/** What the page is doing. The name is also what the stylesheet reads, so it is not translated. */
+function titleState(state: AppState): TitleState {
   if (state.phase === 'connecting') return 'connecting';
   if (state.finding) return 'vibrating';
   if (state.busy > 0) return 'working';
   return state.phase === 'connected' ? 'ready' : 'idle';
 }
 
-function titleDevice(state: AppState): string {
+function titleDevice(state: AppState, t: Translate): string {
   const device = state.device;
-  if (device === null) return 'not connected';
+  if (device === null) return t('bar.notConnected');
   const label = device.label === undefined ? '' : ` [${device.label}]`;
-  return `${device.kind === 'simulated' ? 'simulated ' : ''}${modelLabel(device.model)}${label}`;
+  const model = modelLabel(device.model);
+  return `${device.kind === 'simulated' ? t('bar.simulated', { model }) : model}${label}`;
 }
 
 /**
@@ -83,6 +97,7 @@ export function mount(app: App): void {
   const saveContainer = byId('save-pane');
   const settingsContainer = byId('settings-pane');
   const toasts = byId('toasts');
+  const languageSelect = byId('language', HTMLSelectElement);
 
   byId('version').textContent = app.version;
 
@@ -93,16 +108,20 @@ export function mount(app: App): void {
 
   const wide = typeof matchMedia === 'function' && matchMedia(WIDE_LAYOUT).matches;
   const ui = createPaneUi(stage, wide, (button) => {
+    // The language is read when each word is shown: it may change in between.
+    const say = (key: MessageKey): void => {
+      button.textContent = app.store.get().i18n.t(key);
+    };
     const restore = (): void => {
-      setTimeout(() => (button.textContent = 'Copy session log'), 1800);
+      setTimeout(() => say('device.copyLog'), 1800);
     };
     navigator.clipboard.writeText(sessionLog(app.store.get(), app.version)).then(
       () => {
-        button.textContent = 'Copied';
+        say('device.copied');
         restore();
       },
       () => {
-        button.textContent = 'Copy failed';
+        say('device.copyFailed');
         restore();
       },
     );
@@ -123,15 +142,23 @@ export function mount(app: App): void {
     }, TOAST_MS);
   };
 
+  /** A line that carries a message is said in the page's language; any other is shown as printed. */
+  const said = (line: ConsoleLine): string =>
+    line.message === undefined
+      ? line.text.replace(/^Error: /, '')
+      : render(app.store.get().i18n.t, line.message);
+
   const report = (lines: readonly ConsoleLine[]): void => {
     const from = reportFrom;
     reportFrom = null;
     if (from === null) return;
-    const fresh = lines.filter((line) => line.id > from && line.tone !== 'input' && line.text !== '');
+    const fresh = lines.filter(
+      (line) => line.id > from && line.tone !== 'input' && line.text !== '' && !aboutLanguage(line),
+    );
     const failure = fresh.find((line) => line.tone === 'error');
     const [only] = fresh;
-    if (failure !== undefined) toast(failure.text.replace(/^Error: /, ''), 'error');
-    else if (fresh.length === 1 && only !== undefined) toast(only.text, 'out');
+    if (failure !== undefined) toast(said(failure), 'error');
+    else if (fresh.length === 1 && only !== undefined) toast(said(only), 'out');
   };
 
   /** The button most recently clicked inside the page's main region. */
@@ -158,42 +185,70 @@ export function mount(app: App): void {
 
   // ── Controls that are always on the page ──────────────────────────────────
 
+  // Choosing a language does not queue, so nothing waits on it and a choice
+  // that works needs no toast: the page itself is the answer. One that fails
+  // leaves the page as it was, and that has to be said.
+  bindLanguage(languageSelect, async (locale, latest) => {
+    const newest = app.store.get().console.at(-1)?.id ?? 0;
+    await app.run(`lang ${locale}`);
+    // Overtaken by a later choice: the app dropped this one without a word,
+    // and the select and any failure are the later one's to settle.
+    if (!latest()) return;
+    const state = app.store.get();
+    languageSelect.value = state.i18n.locale;
+    const failure = state.console.find((line) => line.id > newest && line.tone === 'error' && aboutLanguage(line));
+    if (failure !== undefined) toast(said(failure), 'error');
+  });
+
   connectButton.addEventListener('click', () => run('connect'));
   connectAllButton.addEventListener('click', () => run('connect --all'));
   const connectControls: HTMLElement[] = [connectButton, connectAllButton];
 
   // The simulator's controls exist only in builds that carry the simulator.
+  // They carry the same attribute as the words in index.html, so they are
+  // filled, and filled again when the language changes, along with those.
   const tiles = byId('model-tiles');
   if (app.canSimulate) {
-    const demoButton = h(
-      'button',
-      { class: 'button', attrs: { type: 'button', id: 'demo-button' }, on: { click: () => run('demo') } },
-      'Try a simulated device',
-    );
+    const demoButton = h('button', {
+      class: 'button',
+      attrs: { type: 'button', id: 'demo-button', 'data-i18n': 'page.demo' },
+      on: { click: () => run('demo') },
+    });
     connectButton.after(demoButton);
     connectControls.push(demoButton);
-    tiles.before(h('p', { class: 'card-lead' }, 'No device at hand? Pick a model to try it simulated.'));
+    tiles.before(h('p', { class: 'card-lead', attrs: { 'data-i18n': 'page.demoLead' } }));
   }
-  redraw(tiles, modelTiles(stage, app.canSimulate ? run : null));
 
   // ── Drawing ───────────────────────────────────────────────────────────────
 
   const draw = (state: AppState, previous: AppState | null): void => {
     const connected = state.phase === 'connected';
+    const { t } = state.i18n;
 
-    if (changed(state, previous, ['phase'])) {
+    // First, because it also resets the few elements that the blocks below
+    // then write over with the state of the moment.
+    if (changed(state, previous, ['i18n'])) {
+      document.documentElement.lang = state.i18n.locale;
+      languageSelect.value = state.i18n.locale;
+      // Only after a choice made here: the address that opened the page keeps its `?lang=`.
+      if (previous !== null) dropLanguageParameter();
+      applyStaticText(document, t);
+      redraw(tiles, modelTiles(stage, app.canSimulate ? run : null, t));
+    }
+
+    if (changed(state, previous, ['phase', 'i18n'])) {
       intro.hidden = connected;
       workspace.hidden = !connected;
-      if (!connected) resetPaneUi(ui);
+      if (!connected && changed(state, previous, ['phase'])) resetPaneUi(ui);
 
       const connecting = state.phase === 'connecting';
-      connectButton.textContent = connecting ? 'Connecting' : 'Connect a device';
+      connectButton.textContent = t(connecting ? 'page.connecting' : 'page.connect');
       for (const control of connectControls) {
         control.setAttribute('aria-disabled', String(connecting));
       }
       // Moving between the intro and the workspace removes whatever had
       // focus, so start at the top of the view that just appeared.
-      if (previous !== null && (connected || previous.phase === 'connected')) {
+      if (previous !== null && previous.phase !== state.phase && (connected || previous.phase === 'connected')) {
         main.focus({ preventScroll: true });
         if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
       }
@@ -202,32 +257,37 @@ export function mount(app: App): void {
     // A command is starting: readings that differ from now on are news.
     if (previous !== null && previous.busy === 0 && state.busy > 0) commitMemory(ui.memory);
 
-    if (changed(state, previous, ['support'])) {
+    if (changed(state, previous, ['support', 'i18n'])) {
       const notice = SUPPORT_NOTICE[state.support];
       supportNotice.textContent =
-        notice !== '' && app.canSimulate ? `${notice}${SIMULATOR_STILL_WORKS}` : notice;
+        notice === null ? '' : `${t(notice)}${app.canSimulate ? t('notice.simulatorStillWorks') : ''}`;
       supportNotice.hidden = state.support === 'ok';
       connectButton.hidden = state.support !== 'ok';
       connectAllButton.hidden = state.support !== 'ok';
       connectAllRow.hidden = state.support !== 'ok';
     }
 
-    if (changed(state, previous, ['phase', 'device', 'busy', 'finding'])) {
-      titleDeviceElement.textContent = titleDevice(state);
-      titleStateElement.textContent = titleState(state);
+    if (changed(state, previous, ['phase', 'device', 'busy', 'finding', 'i18n'])) {
+      titleDeviceElement.textContent = titleDevice(state, t);
+      titleStateElement.textContent = t(`bar.state.${titleState(state)}`);
       titleStateElement.dataset['state'] = titleState(state);
       bar.dataset['busy'] = String(state.busy > 0 || state.phase === 'connecting');
       workspace.dataset['finding'] = String(state.finding);
     }
 
-    if (changed(state, previous, ['book', 'phase'])) {
+    if (changed(state, previous, ['book', 'phase', 'i18n'])) {
       redraw(savedContainer, connected ? [] : savedDevices(state, run));
     }
     // The save form lives outside the device pane so that a reading arriving
     // mid-keystroke does not rebuild the field the user is typing in.
-    if (changed(state, previous, ['device'])) {
+    if (changed(state, previous, ['device', 'i18n'])) {
       const device = state.device;
-      redraw(saveContainer, device?.kind === 'ble' ? [saveForm(device, run)] : []);
+      // A change of language redraws the form too; what was being typed into it stays.
+      const labelField = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>('#save-label');
+      const typed = previous?.device === device ? labelField()?.value : undefined;
+      redraw(saveContainer, device?.kind === 'ble' ? [saveForm(device, run, t)] : []);
+      const field = labelField();
+      if (field !== null && typed !== undefined) field.value = typed;
     }
     if (changed(state, previous, DEVICE_KEYS)) {
       redraw(deviceContainer, devicePane(state, run, ui));
@@ -245,4 +305,6 @@ export function mount(app: App): void {
   app.store.subscribe(draw);
   draw(app.store.get(), null);
   main.dataset['mounted'] = '';
+  // The page is in the visitor's language now: uncover it (see `data-boot` in the stylesheet).
+  document.documentElement.removeAttribute('data-boot');
 }
